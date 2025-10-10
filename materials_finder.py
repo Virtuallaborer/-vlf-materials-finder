@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 import urllib.parse
+import json
 
 # Page config
 st.set_page_config(page_title="VLF Materials Finder", page_icon="🔨", layout="wide")
@@ -244,14 +245,14 @@ if not st.session_state.authenticated:
     # SHOW LOGIN SCREEN
     st.markdown("""
     <div class="main-header" style="text-align: center;">
-        <h1>🔨 VLF Materials Finder</h1>
+        <h1>🔨 Virtual Labor Force Materials Finder and Calculator</h1>
         <p>Professional Tool for Construction Professionals</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown('<div class="login-box">', unsafe_allow_html=True)
     st.markdown('<h3>🔒 Customer Access</h3>', unsafe_allow_html=True)
-    st.markdown('<p>This is a premium tool for Virual Labor Force customers.</p>', unsafe_allow_html=True)
+    st.markdown('<p>This is a premium tool for Virtual Laor Force customers.</p>', unsafe_allow_html=True)
     
     password_input = st.text_input("Enter Your Access Password:", type="password", key="login_pwd")
     
@@ -270,10 +271,12 @@ if not st.session_state.authenticated:
     st.markdown('<p style="color: #a0c4ff; font-weight: 600;">Get instant access to:</p>', unsafe_allow_html=True)
     st.markdown("""
     <ul style="color: #a0c4ff;">
-        <li>✅ Daily materials list builder</li>
+        <li>✅ Daily materials list builder with quantities</li>
+        <li>✅ Price tracking & automatic estimate calculations</li>
+        <li>✅ Save & reload lists anytime (JSON/CSV)</li>
         <li>✅ Instant search at Home Depot & Lowe's</li>
         <li>✅ Store locator with mapping</li>
-        <li>✅ Export lists as CSV or text</li>
+        <li>✅ Export lists as formatted text, CSV, or JSON</li>
         <li>✅ Mobile-friendly on any device</li>
     </ul>
     """, unsafe_allow_html=True)
@@ -281,9 +284,9 @@ if not st.session_state.authenticated:
     st.markdown('<p style="color: #a0c4ff; font-weight: 600; margin-top: 1rem;">Subscription Plans:</p>', unsafe_allow_html=True)
     st.markdown("""
     <ul style="color: #a0c4ff;">
-        <li><strong>Solo Contractor:</strong> $29/month</li>
-        <li><strong>Small Crew (3-5):</strong> $49/month</li>
-        <li><strong>Company License:</strong> $99/month</li>
+        <li><strong>Solo Contractor:</strong> $50/month</li>
+        <li><strong>Small Crew (3-5):</strong> $100-150/month</li>
+        <li><strong>Company License:</strong> $Call for Company Pricing (586)-449-4640</li>
     </ul>
     """, unsafe_allow_html=True)
     
@@ -292,11 +295,11 @@ if not st.session_state.authenticated:
     <p style="color: #a0c4ff;">
         📧 <strong>Email:</strong> virtualadmin@virtuallaborforce.com<br>
         📞 <strong>Phone:</strong> (586)449-4640<br>
-        🌐 <strong>Web:</strong> www.virtuallaborforce.com
+        🌐 <strong>Web:</strong> www.virtuallaborforce.com.com
     </p>
     """, unsafe_allow_html=True)
     
-    st.markdown('<p style="color: #7c8db5; font-style: italic; margin-top: 1rem;">*We accept Venmo, Zelle, and Invoice payments*</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color: #7c8db5; font-style: italic; margin-top: 1rem;">*We accept CashApp, Cardano, Zelle, and Invoice payments*</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
@@ -308,13 +311,26 @@ if 'zip_code' not in st.session_state:
 if 'input_key' not in st.session_state:
     st.session_state.input_key = 0
 
+# Helper function to calculate total
+def calculate_total(material_list):
+    total = 0
+    for item in material_list:
+        price = item.get('Price', 0)
+        qty = item.get('Qty', 1)
+        if price and qty:
+            try:
+                total += float(price) * float(qty)
+            except (ValueError, TypeError):
+                pass
+    return total
+
 # Header with logout
 col_head1, col_head2 = st.columns([5, 1])
 with col_head1:
     st.markdown("""
     <div class="main-header">
-        <h1>🔨 VLF Materials Finder</h1>
-        <p>Save Time on the Job Site | Built by Virtual Labor Force, Detroit</p>
+        <h1>🔨 Virtual Labor Force Materials Finder and Calculator</h1>
+        <p>Save Time on the Job Site | Built by Virtual Labor Force, Detroit, MI</p>
     </div>
     """, unsafe_allow_html=True)
 with col_head2:
@@ -344,11 +360,52 @@ with col2:
                 st.error("Invalid ZIP")
 st.markdown('</div>', unsafe_allow_html=True)
 
+# ===== LOAD PREVIOUS LIST SECTION =====
+st.markdown('<div class="section-box">', unsafe_allow_html=True)
+st.markdown("### 📂 Load Previous List")
+
+uploaded_file = st.file_uploader("Import a previously saved list", type=['json', 'csv'], 
+                                 label_visibility="collapsed",
+                                 help="Upload a JSON or CSV file you previously exported")
+
+if uploaded_file is not None:
+    try:
+        if uploaded_file.name.endswith('.json'):
+            # Load JSON
+            data = json.load(uploaded_file)
+            st.session_state.material_list = data
+            st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+            st.rerun()
+        elif uploaded_file.name.endswith('.csv'):
+            # Load CSV
+            df = pd.read_csv(uploaded_file)
+            # Ensure required columns exist
+            if 'Item' not in df.columns:
+                st.error("CSV must have an 'Item' column")
+            else:
+                # Fill missing columns with defaults
+                if 'Qty' not in df.columns:
+                    df['Qty'] = 1
+                if 'Price' not in df.columns:
+                    df['Price'] = 0.0
+                if 'Store' not in df.columns:
+                    df['Store'] = ""
+                if 'Added' not in df.columns:
+                    df['Added'] = date.today().strftime("%m/%d/%Y")
+                
+                st.session_state.material_list = df.to_dict('records')
+                st.success(f"✅ Loaded {len(df)} items from {uploaded_file.name}")
+                st.rerun()
+    except Exception as e:
+        st.error(f"Error loading file: {str(e)}")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 # ===== ADD MATERIALS SECTION =====
 st.markdown('<div class="section-box">', unsafe_allow_html=True)
 st.markdown("### ➕ Add Materials")
 
-col1, col2 = st.columns([5, 1])
+col1, col2, col3 = st.columns([4, 1, 1])
 with col1:
     new_item = st.text_input(
         "Item", 
@@ -357,10 +414,16 @@ with col1:
         placeholder="e.g., '4x30 wood door, 6 panel' or '10 3.5\" hinges'"
     )
 with col2:
+    new_qty = st.number_input("Quantity", min_value=1, value=1, step=1, 
+                               label_visibility="collapsed", key=f"qty_input_{st.session_state.input_key}")
+with col3:
     if st.button("➕ Add", type="primary", use_container_width=True):
         if new_item and new_item.strip():
             st.session_state.material_list.append({
-                "Item": new_item.strip(), 
+                "Item": new_item.strip(),
+                "Qty": new_qty,
+                "Price": 0.0,
+                "Store": "",
                 "Added": date.today().strftime("%m/%d/%Y")
             })
             st.session_state.input_key += 1
@@ -375,18 +438,57 @@ if st.session_state.material_list:
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
     st.markdown(f"### 📋 Today's List ({len(st.session_state.material_list)} items)")
     
+    # Add instructions
+    st.markdown("""
+    <p style="color: #a0c4ff; font-size: 0.9rem; margin-bottom: 1rem;">
+    💡 <strong>Tip:</strong> After searching for items below, come back here and enter the prices you find. The total estimate will calculate automatically!
+    </p>
+    """, unsafe_allow_html=True)
+    
     df = pd.DataFrame(st.session_state.material_list)
+    
+    # Ensure all columns exist
+    if 'Qty' not in df.columns:
+        df['Qty'] = 1
+    if 'Price' not in df.columns:
+        df['Price'] = 0.0
+    if 'Store' not in df.columns:
+        df['Store'] = ""
+    
     edited_df = st.data_editor(
         df, 
         num_rows="dynamic", 
         use_container_width=True, 
         hide_index=True,
         column_config={
-            "Item": st.column_config.TextColumn("Material Item", width="large"),
-            "Added": st.column_config.TextColumn("Date Added", width="small")
-        }
+            "Item": st.column_config.TextColumn("Material Item", width="large", required=True),
+            "Qty": st.column_config.NumberColumn("Qty", width="small", min_value=1, default=1),
+            "Price": st.column_config.NumberColumn("Price ($)", width="medium", format="$%.2f", min_value=0),
+            "Store": st.column_config.SelectboxColumn("Store", width="medium", 
+                options=["", "Home Depot", "Lowe's", "Other"]),
+            "Added": st.column_config.TextColumn("Date", width="small")
+        },
+        column_order=["Item", "Qty", "Price", "Store", "Added"]
     )
     st.session_state.material_list = edited_df.to_dict('records')
+    
+    # Calculate and display total
+    total = calculate_total(st.session_state.material_list)
+    
+    if total > 0:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                    padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                    border: 1px solid rgba(16, 185, 129, 0.5);
+                    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);">
+            <h3 style="color: white; margin: 0; font-size: 1.8rem; text-align: center;">
+                💰 Estimated Total: ${total:,.2f}
+            </h3>
+            <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;">
+                Based on prices entered • Excludes tax & fees
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     col1, col2, col3, col4 = st.columns(4)
@@ -395,21 +497,52 @@ if st.session_state.material_list:
             st.session_state.material_list = []
             st.rerun()
     with col2:
-        list_text = "\n".join([f"• {item['Item']}" for item in st.session_state.material_list])
-        st.download_button("📋 Text List", list_text, "materials_list.txt", 
+        # Better formatted text export
+        list_text = "=" * 50 + "\n"
+        list_text += "VLF MATERIALS LIST\n"
+        list_text += f"Date: {date.today().strftime('%m/%d/%Y')}\n"
+        list_text += f"ZIP Code: {st.session_state.zip_code}\n"
+        list_text += "=" * 50 + "\n\n"
+        
+        for idx, item in enumerate(st.session_state.material_list, 1):
+            qty = item.get('Qty', 1)
+            price = item.get('Price', 0)
+            store = item.get('Store', '')
+            item_total = float(qty) * float(price) if price else 0
+            
+            list_text += f"#{idx}. {item['Item']}\n"
+            list_text += f"    Quantity: {qty}\n"
+            list_text += f"    Price: ${price:.2f} each\n"
+            if store:
+                list_text += f"    Store: {store}\n"
+            list_text += f"    Subtotal: ${item_total:.2f}\n"
+            list_text += "\n"
+        
+        list_text += "=" * 50 + "\n"
+        list_text += f"TOTAL ESTIMATE: ${total:,.2f}\n"
+        list_text += "=" * 50 + "\n"
+        list_text += "\n(Excludes tax & fees)\n"
+        
+        st.download_button("📋 Text List", list_text, 
+                          f"materials_list_{date.today().strftime('%Y%m%d')}.txt", 
                           "text/plain", use_container_width=True)
     with col3:
-        csv = df.to_csv(index=False)
-        st.download_button("📥 CSV Export", csv, "materials_list.csv", 
+        csv = edited_df.to_csv(index=False)
+        st.download_button("📥 CSV Export", csv, 
+                          f"materials_list_{date.today().strftime('%Y%m%d')}.csv", 
                           "text/csv", use_container_width=True)
     with col4:
-        st.markdown(f"<p style='color: #00D9FF; font-weight: 600; text-align: center; padding-top: 0.5rem;'>Total: {len(st.session_state.material_list)}</p>", unsafe_allow_html=True)
+        # JSON export for perfect reload
+        json_data = json.dumps(st.session_state.material_list, indent=2)
+        st.download_button("💾 JSON Export", json_data, 
+                          f"materials_list_{date.today().strftime('%Y%m%d')}.json",
+                          "application/json", use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.markdown("""
     <div class="info-box">
-        <p style="margin: 0; color: #a0c4ff;">💡 <strong>No materials added yet</strong> — start building your list above!</p>
+        <p style="margin: 0; color: #a0c4ff;">💡 <strong>No materials added yet</strong> — start building your list above, or load a previously saved list!</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -476,19 +609,27 @@ if st.session_state.material_list:
         
         with st.expander("💡 How to Find Aisle Locations & Prices"):
             st.markdown("""
-            **Finding Items:**
+            **Finding Items & Prices:**
             1. Click **"Search This Item"** to see all matching products
             2. Select the specific product you need
-            3. On product page, click **"Check Nearby Stores"**
-            4. Choose your preferred store location
-            5. View **aisle/bay number** and **real-time inventory**
+            3. **Note the price** displayed on the product page
+            4. On product page, click **"Check Nearby Stores"**
+            5. Choose your preferred store location
+            6. View **aisle/bay number** and **real-time inventory**
+            7. **Come back here** and enter the price in the "Price" column above
+            
+            **Building Your Estimate:**
+            - Enter prices as you find them for each item
+            - Select which store you found it at (optional)
+            - The **Total Estimate** will calculate automatically
+            - Download your complete list with prices for record-keeping
             
             **Finding Stores:**
             - Click **"Find Nearby Stores"** to see all locations on Google Maps
             - Shows distance, hours, and directions
             - Click any store to get directions or call
             
-            **Pro tip:** Right-click links → "Open in New Tab" to keep your list visible!
+            **Pro tip:** Right-click links → "Open in New Tab" to keep your list visible while searching!
             """)
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -497,8 +638,8 @@ if st.session_state.material_list:
 st.markdown("---")
 st.markdown(f"""
 <div style="text-align: center; color: #7c8db5; padding: 1rem 0;">
-    <p style="margin: 0.25rem 0;">⚙️ <strong style="color: #00D9FF;">VLF Detroit, MI</strong> | AI Tools for Construction</p>
-    <p style="margin: 0.25rem 0;">📧 Need help? Contact support@vlf.com</p>
+    <p style="margin: 0.25rem 0;">⚙️ <strong style="color: #00D9FF;">Virtual Labor Force Detroit, Michigan an AI Custom Solutions Company</strong> | AI Tools for Construction</p>
+    <p style="margin: 0.25rem 0;">📧 Need help? Contact virtualadmin@virtuallaborforce.com</p>
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
