@@ -5,7 +5,7 @@ import urllib.parse
 import json
 
 # Page config
-st.set_page_config(page_title="VLF Materials Finder", page_icon="🔨", layout="wide")
+st.set_page_config(page_title="VLF Materials Finder & Calculator", page_icon="🔨", layout="wide")
 
 # ===== PASSWORD - CHANGE THIS =====
 ACCESS_PASSWORD = "VLF2025"
@@ -245,14 +245,14 @@ if not st.session_state.authenticated:
     # SHOW LOGIN SCREEN
     st.markdown("""
     <div class="main-header" style="text-align: center;">
-        <h1>🔨 Virtual Labor Force Materials Finder and Calculator</h1>
+        <h1>🔨 VLF Materials Finder</h1>
         <p>Professional Tool for Construction Professionals</p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown('<div class="login-box">', unsafe_allow_html=True)
     st.markdown('<h3>🔒 Customer Access</h3>', unsafe_allow_html=True)
-    st.markdown('<p>This is a premium tool for Virtual Labor Force Customers ONLY!.</p>', unsafe_allow_html=True)
+    st.markdown('<p>This is a premium tool for Virtual Labor Force clients ONLY!</p>', unsafe_allow_html=True)
     
     password_input = st.text_input("Enter Your Access Password:", type="password", key="login_pwd")
     
@@ -285,8 +285,8 @@ if not st.session_state.authenticated:
     st.markdown("""
     <ul style="color: #a0c4ff;">
         <li><strong>Solo Contractor:</strong> $50/month</li>
-        <li><strong>Small Crew (3-5):</strong> $100-150/month</li>
-        <li><strong>Company License:</strong> $Call for Company Pricing (586)-449-4640</li>
+        <li><strong>Small Crew (3-5):</strong> $150/month</li>
+        <li><strong>Company License:</strong> CALL FOR PRICING (586)449-4640 Actual Human Will Answer, AI is to assist us all NOT to replace the HUMAN connection</li>
     </ul>
     """, unsafe_allow_html=True)
     
@@ -299,7 +299,7 @@ if not st.session_state.authenticated:
     </p>
     """, unsafe_allow_html=True)
     
-    st.markdown('<p style="color: #7c8db5; font-style: italic; margin-top: 1rem;">*We accept CashApp, Cardano, Zelle, and Invoice payments*</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color: #7c8db5; font-style: italic; margin-top: 1rem;">*We accept Cardano, Bitcoin, Zelle, and Invoice payments*</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
@@ -329,8 +329,8 @@ col_head1, col_head2 = st.columns([5, 1])
 with col_head1:
     st.markdown("""
     <div class="main-header">
-        <h1>🔨 Virtual Labor Force Materials Finder and Calculator</h1>
-        <p>Save Time on the Job Site | Built by Virtual Labor Force, Detroit, MI</p>
+        <h1>🔨 VLF Materials Finder</h1>
+        <p>Save Time on the Job Site | Built by Virtual Labor Force, Detroit</p>
     </div>
     """, unsafe_allow_html=True)
 with col_head2:
@@ -441,36 +441,65 @@ if st.session_state.material_list:
     # Add instructions
     st.markdown("""
     <p style="color: #a0c4ff; font-size: 0.9rem; margin-bottom: 1rem;">
-    💡 <strong>Tip:</strong> After searching for items below, come back here and enter the prices you find. The total estimate will calculate automatically!
+    💡 <strong>Tip:</strong> After searching for items below, come back here and enter the prices you find. 
+    Check boxes to select items for deletion.
     </p>
     """, unsafe_allow_html=True)
     
-    df = pd.DataFrame(st.session_state.material_list)
+    # Create columns to constrain table width
+    col_spacer1, col_table, col_spacer2 = st.columns([0.5, 10, 0.5])
     
-    # Ensure all columns exist
-    if 'Qty' not in df.columns:
-        df['Qty'] = 1
-    if 'Price' not in df.columns:
-        df['Price'] = 0.0
-    if 'Store' not in df.columns:
-        df['Store'] = ""
-    
-    edited_df = st.data_editor(
-        df, 
-        num_rows="dynamic", 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "Item": st.column_config.TextColumn("Material Item", width="large", required=True),
-            "Qty": st.column_config.NumberColumn("Qty", width="small", min_value=1, default=1),
-            "Price": st.column_config.NumberColumn("Price ($)", width="medium", format="$%.2f", min_value=0),
-            "Store": st.column_config.SelectboxColumn("Store", width="medium", 
-                options=["", "Home Depot", "Lowe's", "Other"]),
-            "Added": st.column_config.TextColumn("Date", width="small")
-        },
-        column_order=["Item", "Qty", "Price", "Store", "Added"]
-    )
-    st.session_state.material_list = edited_df.to_dict('records')
+    with col_table:
+        # Add checkboxes for selection
+        if 'selected_items' not in st.session_state:
+            st.session_state.selected_items = []
+        
+        df = pd.DataFrame(st.session_state.material_list)
+        
+        # Ensure all columns exist
+        if 'Qty' not in df.columns:
+            df['Qty'] = 1
+        if 'Price' not in df.columns:
+            df['Price'] = 0.0
+        if 'Store' not in df.columns:
+            df['Store'] = ""
+        
+        # Add selection column
+        df.insert(0, 'Select', False)
+        
+        edited_df = st.data_editor(
+            df, 
+            use_container_width=True, 
+            hide_index=True,
+            height=180,
+            disabled=["Added"],
+            column_config={
+                "Select": st.column_config.CheckboxColumn("☑️", width="small", default=False),
+                "Item": st.column_config.TextColumn("Material Item", width="medium", required=True),
+                "Qty": st.column_config.NumberColumn("Qty", width="small", min_value=1, default=1, step=1),
+                "Price": st.column_config.NumberColumn("Price ($)", width="small", format="$%.2f", min_value=0, step=0.01),
+                "Store": st.column_config.SelectboxColumn("Store", width="small", 
+                    options=["", "Home Depot", "Lowe's", "Other"]),
+                "Added": st.column_config.TextColumn("Date", width="small")
+            },
+            column_order=["Select", "Item", "Qty", "Price", "Store", "Added"]
+        )
+        
+        # Update material list (remove Select column)
+        temp_df = edited_df.drop(columns=['Select'])
+        st.session_state.material_list = temp_df.to_dict('records')
+        
+        # Check if any items are selected
+        selected_mask = edited_df['Select'] == True
+        num_selected = selected_mask.sum()
+        
+        if num_selected > 0:
+            col_del1, col_del2, col_del3 = st.columns([2, 1, 2])
+            with col_del2:
+                if st.button(f"🗑️ Delete ({num_selected}) Selected", type="primary", use_container_width=True):
+                    # Keep only unselected items
+                    st.session_state.material_list = edited_df[~selected_mask].drop(columns=['Select']).to_dict('records')
+                    st.rerun()
     
     # Calculate and display total
     total = calculate_total(st.session_state.material_list)
@@ -638,10 +667,8 @@ if st.session_state.material_list:
 st.markdown("---")
 st.markdown(f"""
 <div style="text-align: center; color: #7c8db5; padding: 1rem 0;">
-    <p style="margin: 0.25rem 0;">⚙️ <strong style="color: #00D9FF;">Virtual Labor Force Detroit, Michigan an AI Custom Solutions Company</strong> | AI Tools for Construction</p>
-    <p style="margin: 0.25rem 0;">📧 Need help? Contact virtualadmin@virtuallaborforce.com</p>
+    <p style="margin: 0.25rem 0;">⚙️ <strong style="color: #00D9FF;">Virtual Labor Force Detroit, MI</strong> | AI Solutions for Construction</p>
+    <p style="margin: 0.25rem 0;">📧 Need help? Contact support@virtualadmin@virtuallaborforce.com</p>
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
-
-
