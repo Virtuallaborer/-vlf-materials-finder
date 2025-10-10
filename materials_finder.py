@@ -295,7 +295,7 @@ if not st.session_state.authenticated:
     <p style="color: #a0c4ff;">
         📧 <strong>Email:</strong> virtualadmin@virtuallaborforce.com<br>
         📞 <strong>Phone:</strong> (586)449-4640<br>
-        🌐 <strong>Web:</strong> www.virtuallaborforce.com.com
+        🌐 <strong>Web:</strong> www.virtuallaborforce.com
     </p>
     """, unsafe_allow_html=True)
     
@@ -643,3 +643,4 @@ st.markdown(f"""
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
+
