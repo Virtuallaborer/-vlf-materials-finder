@@ -252,7 +252,7 @@ if not st.session_state.authenticated:
     
     st.markdown('<div class="login-box">', unsafe_allow_html=True)
     st.markdown('<h3>🔒 Customer Access</h3>', unsafe_allow_html=True)
-    st.markdown('<p>This is a premium tool for Virtual Laor Force customers.</p>', unsafe_allow_html=True)
+    st.markdown('<p>This is a premium tool for Virtual Labor Force Customers ONLY!.</p>', unsafe_allow_html=True)
     
     password_input = st.text_input("Enter Your Access Password:", type="password", key="login_pwd")
     
@@ -643,4 +643,5 @@ st.markdown(f"""
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
+
 
