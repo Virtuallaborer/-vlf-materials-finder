@@ -284,9 +284,9 @@ if not st.session_state.authenticated:
     st.markdown('<p style="color: #a0c4ff; font-weight: 600; margin-top: 1rem;">Subscription Plans:</p>', unsafe_allow_html=True)
     st.markdown("""
     <ul style="color: #a0c4ff;">
-        <li><strong>Solo Contractor:</strong> $50/month</li>
-        <li><strong>Small Crew (3-5):</strong> $150/month</li>
-        <li><strong>Company License:</strong> CALL FOR PRICING (586)449-4640 Actual Human Will Answer, AI is to assist us all NOT to replace the HUMAN connection</li>
+        <li><strong>Solo Contractor:</strong> $10/month</li>
+        <li><strong>Small Crew (3-5):</strong> $35/month</li>
+        <li><strong>Company License:</strong> CALL FOR PRICING and more Customization (586)449-4640 Actual Human Will Answer, AI is to assist us all NOT to replace the HUMAN connection</li>
     </ul>
     """, unsafe_allow_html=True)
     
@@ -668,7 +668,8 @@ st.markdown("---")
 st.markdown(f"""
 <div style="text-align: center; color: #7c8db5; padding: 1rem 0;">
     <p style="margin: 0.25rem 0;">⚙️ <strong style="color: #00D9FF;">Virtual Labor Force Detroit, MI</strong> | AI Solutions for Construction</p>
-    <p style="margin: 0.25rem 0;">📧 Need help? Contact support@virtualadmin@virtuallaborforce.com</p>
+    <p style="margin: 0.25rem 0;">📧 Need help? Contact virtualadmin@virtuallaborforce.com</p>
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
+
