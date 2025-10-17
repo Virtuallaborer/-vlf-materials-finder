@@ -190,6 +190,11 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
+    .stNumberInput label {
+        color: #00D9FF !important;
+        font-weight: 600 !important;
+    }
+    
     .stMarkdown {
         color: #a0c4ff !important;
     }
@@ -310,6 +315,12 @@ if 'zip_code' not in st.session_state:
     st.session_state.zip_code = "48201"
 if 'input_key' not in st.session_state:
     st.session_state.input_key = 0
+if 'customer_name' not in st.session_state:
+    st.session_state.customer_name = ""
+if 'labor_hours' not in st.session_state:
+    st.session_state.labor_hours = 0.0
+if 'hourly_rate' not in st.session_state:
+    st.session_state.hourly_rate = 0.0
 
 # Helper function to calculate total
 def calculate_total(material_list):
@@ -323,6 +334,13 @@ def calculate_total(material_list):
             except (ValueError, TypeError):
                 pass
     return total
+
+# Helper function to calculate labor cost
+def calculate_labor_cost(hours, rate):
+    try:
+        return float(hours) * float(rate)
+    except (ValueError, TypeError):
+        return 0
 
 # Header with logout
 col_head1, col_head2 = st.columns([5, 1])
@@ -340,11 +358,21 @@ with col_head2:
         st.session_state.authenticated = False
         st.rerun()
 
-# ===== ZIP CODE SECTION =====
+# ===== CUSTOMER & JOB INFORMATION SECTION =====
 st.markdown('<div class="section-box">', unsafe_allow_html=True)
-col1, col2 = st.columns([1, 3])
+st.markdown("### 👤 Customer & Job Information")
+
+col1, col2 = st.columns(2)
 with col1:
-    st.markdown("### 📍 Location")
+    customer_name = st.text_input(
+        "Customer Name", 
+        value=st.session_state.customer_name,
+        placeholder="Enter customer name for this job",
+        key="customer_name_input"
+    )
+    if customer_name != st.session_state.customer_name:
+        st.session_state.customer_name = customer_name
+
 with col2:
     subcol1, subcol2 = st.columns([2, 1])
     with subcol1:
@@ -358,6 +386,47 @@ with col2:
                 st.success(f"✓ Updated to {zip_input}")
             else:
                 st.error("Invalid ZIP")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ===== LABOR COSTS SECTION =====
+st.markdown('<div class="section-box-purple">', unsafe_allow_html=True)
+st.markdown("### ⏰ Labor Information")
+
+col1, col2, col3 = st.columns([2, 2, 2])
+with col1:
+    labor_hours = st.number_input(
+        "Hours", 
+        min_value=0.0, 
+        value=float(st.session_state.labor_hours),
+        step=0.5,
+        format="%.1f",
+        help="Total hours for this job"
+    )
+    if labor_hours != st.session_state.labor_hours:
+        st.session_state.labor_hours = labor_hours
+
+with col2:
+    hourly_rate = st.number_input(
+        "Rate ($/hour)", 
+        min_value=0.0, 
+        value=float(st.session_state.hourly_rate),
+        step=1.0,
+        format="%.2f",
+        help="Hourly rate for this specific job"
+    )
+    if hourly_rate != st.session_state.hourly_rate:
+        st.session_state.hourly_rate = hourly_rate
+
+with col3:
+    labor_cost = calculate_labor_cost(labor_hours, hourly_rate)
+    st.markdown(f"""
+    <div style="background: rgba(184, 106, 255, 0.2); padding: 1rem; border-radius: 8px; margin-top: 25px;">
+        <div style="color: #B86AFF; font-weight: bold; text-align: center;">Labor Cost</div>
+        <div style="color: #fff; font-size: 1.4rem; font-weight: bold; text-align: center;">${labor_cost:,.2f}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== LOAD PREVIOUS LIST SECTION =====
@@ -373,13 +442,60 @@ if uploaded_file is not None:
         if uploaded_file.name.endswith('.json'):
             # Load JSON
             data = json.load(uploaded_file)
-            st.session_state.material_list = data
-            st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+            
+            # Handle both old format (just materials) and new format (with customer/labor data)
+            if isinstance(data, list):
+                # Old format - just materials list
+                st.session_state.material_list = data
+                st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+            elif isinstance(data, dict):
+                # New format - full job data
+                if 'customer_name' in data:
+                    st.session_state.customer_name = data.get('customer_name', '')
+                if 'zip_code' in data:
+                    st.session_state.zip_code = data.get('zip_code', '48201')
+                if 'labor_hours' in data:
+                    st.session_state.labor_hours = data.get('labor_hours', 0.0)
+                if 'hourly_rate' in data:
+                    st.session_state.hourly_rate = data.get('hourly_rate', 0.0)
+                if 'materials' in data:
+                    st.session_state.material_list = data.get('materials', [])
+                    st.success(f"✅ Loaded complete job data: {len(data.get('materials', []))} items for {data.get('customer_name', 'customer')}")
+                else:
+                    st.session_state.material_list = data
+                    st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
             st.rerun()
         elif uploaded_file.name.endswith('.csv'):
             # Load CSV
             df = pd.read_csv(uploaded_file)
-            # Ensure required columns exist
+            # Check if first row contains metadata
+            if len(df) > 0 and str(df.iloc[0]['Item']).startswith('CUSTOMER:'):
+                # Extract metadata from first row
+                first_row = df.iloc[0]
+                customer_data = str(first_row['Item']).replace('CUSTOMER: ', '')
+                if customer_data != 'N/A':
+                    st.session_state.customer_name = customer_data
+                
+                labor_hours_data = str(first_row['Qty']).replace('LABOR_HOURS: ', '')
+                try:
+                    st.session_state.labor_hours = float(labor_hours_data)
+                except:
+                    pass
+                
+                hourly_rate_data = str(first_row['Price']).replace('HOURLY_RATE: ', '')
+                try:
+                    st.session_state.hourly_rate = float(hourly_rate_data)
+                except:
+                    pass
+                
+                zip_data = str(first_row['Store']).replace('ZIP: ', '')
+                if zip_data.isdigit() and len(zip_data) == 5:
+                    st.session_state.zip_code = zip_data
+                
+                # Remove metadata row and load materials
+                df = df.iloc[1:]
+            
+            # Ensure required columns exist for materials
             if 'Item' not in df.columns:
                 st.error("CSV must have an 'Item' column")
             else:
@@ -394,7 +510,8 @@ if uploaded_file is not None:
                     df['Added'] = date.today().strftime("%m/%d/%Y")
                 
                 st.session_state.material_list = df.to_dict('records')
-                st.success(f"✅ Loaded {len(df)} items from {uploaded_file.name}")
+                customer_msg = f" for {st.session_state.customer_name}" if st.session_state.customer_name else ""
+                st.success(f"✅ Loaded {len(df)} items{customer_msg} from {uploaded_file.name}")
                 st.rerun()
     except Exception as e:
         st.error(f"Error loading file: {str(e)}")
@@ -502,19 +619,32 @@ if st.session_state.material_list:
                     st.rerun()
     
     # Calculate and display total
-    total = calculate_total(st.session_state.material_list)
+    materials_total = calculate_total(st.session_state.material_list)
+    labor_cost = calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate)
+    grand_total = materials_total + labor_cost
     
-    if total > 0:
+    if grand_total > 0:
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                    padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                    padding: 2rem; border-radius: 12px; margin: 1rem 0;
                     border: 1px solid rgba(16, 185, 129, 0.5);
                     box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);">
-            <h3 style="color: white; margin: 0; font-size: 1.8rem; text-align: center;">
-                💰 Estimated Total: ${total:,.2f}
-            </h3>
-            <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;">
-                Based on prices entered • Excludes tax & fees
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; text-align: center;">
+                <div>
+                    <h4 style="color: white; margin: 0; font-size: 1.2rem;">💰 Materials</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.4rem; font-weight: bold;">${materials_total:,.2f}</p>
+                </div>
+                <div>
+                    <h4 style="color: white; margin: 0; font-size: 1.2rem;">⏰ Labor</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.4rem; font-weight: bold;">${labor_cost:,.2f}</p>
+                </div>
+                <div style="border-left: 2px solid rgba(255,255,255,0.3);">
+                    <h4 style="color: white; margin: 0; font-size: 1.2rem;">🎯 TOTAL</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold;">${grand_total:,.2f}</p>
+                </div>
+            </div>
+            <p style="color: rgba(255,255,255,0.9); margin: 1rem 0 0 0; text-align: center; font-size: 0.9rem;">
+                {st.session_state.customer_name and f"Customer: {st.session_state.customer_name} • " or ""}Excludes tax & fees
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -527,17 +657,24 @@ if st.session_state.material_list:
             st.rerun()
     with col2:
         # Better formatted text export
-        list_text = "=" * 50 + "\n"
-        list_text += "VLF MATERIALS LIST\n"
+        list_text = "=" * 60 + "\n"
+        list_text += "VLF MATERIALS & LABOR ESTIMATE\n"
+        list_text += "=" * 60 + "\n"
         list_text += f"Date: {date.today().strftime('%m/%d/%Y')}\n"
+        if st.session_state.customer_name:
+            list_text += f"Customer: {st.session_state.customer_name}\n"
         list_text += f"ZIP Code: {st.session_state.zip_code}\n"
-        list_text += "=" * 50 + "\n\n"
+        list_text += "=" * 60 + "\n\n"
         
+        list_text += "MATERIALS:\n"
+        list_text += "-" * 30 + "\n"
+        materials_total = 0
         for idx, item in enumerate(st.session_state.material_list, 1):
             qty = item.get('Qty', 1)
             price = item.get('Price', 0)
             store = item.get('Store', '')
             item_total = float(qty) * float(price) if price else 0
+            materials_total += item_total
             
             list_text += f"#{idx}. {item['Item']}\n"
             list_text += f"    Quantity: {qty}\n"
@@ -547,24 +684,66 @@ if st.session_state.material_list:
             list_text += f"    Subtotal: ${item_total:.2f}\n"
             list_text += "\n"
         
-        list_text += "=" * 50 + "\n"
-        list_text += f"TOTAL ESTIMATE: ${total:,.2f}\n"
-        list_text += "=" * 50 + "\n"
+        list_text += f"MATERIALS TOTAL: ${materials_total:,.2f}\n\n"
+        
+        # Add labor section
+        labor_cost = calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate)
+        if labor_cost > 0:
+            list_text += "LABOR:\n"
+            list_text += "-" * 30 + "\n"
+            list_text += f"Hours: {st.session_state.labor_hours}\n"
+            list_text += f"Rate: ${st.session_state.hourly_rate:.2f}/hour\n"
+            list_text += f"LABOR TOTAL: ${labor_cost:,.2f}\n\n"
+        
+        grand_total = materials_total + labor_cost
+        list_text += "=" * 60 + "\n"
+        list_text += f"GRAND TOTAL: ${grand_total:,.2f}\n"
+        list_text += "=" * 60 + "\n"
         list_text += "\n(Excludes tax & fees)\n"
         
+        filename = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.txt"
+        
         st.download_button("📋 Text List", list_text, 
-                          f"materials_list_{date.today().strftime('%Y%m%d')}.txt", 
+                          filename, 
                           "text/plain", use_container_width=True)
     with col3:
-        csv = edited_df.to_csv(index=False)
-        st.download_button("📥 CSV Export", csv, 
-                          f"materials_list_{date.today().strftime('%Y%m%d')}.csv", 
+        # Enhanced CSV with customer and labor data
+        export_data = st.session_state.material_list.copy()
+        if export_data:
+            # Add metadata to first row
+            metadata = {
+                'Item': f"CUSTOMER: {st.session_state.customer_name or 'N/A'}",
+                'Qty': f"LABOR_HOURS: {st.session_state.labor_hours}",
+                'Price': f"HOURLY_RATE: {st.session_state.hourly_rate}",
+                'Store': f"ZIP: {st.session_state.zip_code}",
+                'Added': date.today().strftime('%m/%d/%Y')
+            }
+            export_data.insert(0, metadata)
+        
+        csv_data = pd.DataFrame(export_data).to_csv(index=False)
+        filename_csv = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.csv"
+        st.download_button("📥 CSV Export", csv_data, 
+                          filename_csv, 
                           "text/csv", use_container_width=True)
     with col4:
-        # JSON export for perfect reload
-        json_data = json.dumps(st.session_state.material_list, indent=2)
+        # Enhanced JSON export with customer and labor data
+        export_json = {
+            'customer_name': st.session_state.customer_name,
+            'zip_code': st.session_state.zip_code,
+            'labor_hours': st.session_state.labor_hours,
+            'hourly_rate': st.session_state.hourly_rate,
+            'date_created': date.today().strftime('%m/%d/%Y'),
+            'materials': st.session_state.material_list,
+            'totals': {
+                'materials_total': calculate_total(st.session_state.material_list),
+                'labor_total': calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate),
+                'grand_total': calculate_total(st.session_state.material_list) + calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate)
+            }
+        }
+        json_data = json.dumps(export_json, indent=2)
+        filename_json = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.json"
         st.download_button("💾 JSON Export", json_data, 
-                          f"materials_list_{date.today().strftime('%Y%m%d')}.json",
+                          filename_json,
                           "application/json", use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -672,4 +851,3 @@ st.markdown(f"""
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
-
