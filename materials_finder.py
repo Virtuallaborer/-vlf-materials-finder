@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
+from datetime import date
 import urllib.parse
 import json
-import time
 
 # Page config
 st.set_page_config(page_title="VLF Materials Finder & Calculator", page_icon="🔨", layout="wide")
@@ -191,6 +190,11 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
+    .stNumberInput label {
+        color: #00D9FF !important;
+        font-weight: 600 !important;
+    }
+    
     .stDateInput label {
         color: #00D9FF !important;
         font-weight: 600 !important;
@@ -263,7 +267,7 @@ if not st.session_state.authenticated:
     # SHOW LOGIN SCREEN
     st.markdown("""
     <div class="main-header" style="text-align: center;">
-        <h1>🔨 VLF Materials Finder</h1>
+        <h1>🔨 VLF Materials Finder & Calculator</h1>
         <p>Professional Tool for Construction Professionals</p>
     </div>
     """, unsafe_allow_html=True)
@@ -274,7 +278,7 @@ if not st.session_state.authenticated:
     
     password_input = st.text_input("Enter Your Access Password:", type="password", key="login_pwd")
     
-    if st.button("🔓 Login", type="primary", use_container_width=True):
+    if st.button("🔑 Login", type="primary", width="stretch"):
         if password_input == ACCESS_PASSWORD:
             st.session_state.authenticated = True
             st.rerun()
@@ -290,6 +294,7 @@ if not st.session_state.authenticated:
     st.markdown("""
     <ul style="color: #a0c4ff;">
         <li>✅ Daily materials list builder with quantities</li>
+        <li>✅ Construction calculators (square footage, roofing, concrete)</li>
         <li>✅ Price tracking & automatic estimate calculations</li>
         <li>✅ Save & reload lists anytime (JSON/CSV)</li>
         <li>✅ Instant search at Home Depot & Lowe's</li>
@@ -334,7 +339,6 @@ if 'labor_hours' not in st.session_state:
     st.session_state.labor_hours = 0.0
 if 'hourly_rate' not in st.session_state:
     st.session_state.hourly_rate = 0.0
-# New job management fields
 if 'company_name' not in st.session_state:
     st.session_state.company_name = ""
 if 'company_address' not in st.session_state:
@@ -381,7 +385,7 @@ col_head1, col_head2 = st.columns([5, 1])
 with col_head1:
     st.markdown("""
     <div class="main-header">
-        <h1>🔨 VLF Materials Finder</h1>
+        <h1>🔨 VLF Materials Finder & Calculator</h1>
         <p>Save Time on the Job Site | Built by Virtual Labor Force, Detroit</p>
     </div>
     """, unsafe_allow_html=True)
@@ -466,7 +470,7 @@ with col2:
                                   max_chars=5, label_visibility="collapsed",
                                   placeholder="ZIP", key="zip_input")
     with subcol2:
-        if st.button("🔄 Update", use_container_width=True):
+        if st.button("🔄 Update", width="stretch"):
             if zip_input.isdigit() and len(zip_input) == 5:
                 st.session_state.zip_code = zip_input
                 st.success(f"✓ Updated to {zip_input}")
@@ -532,7 +536,6 @@ with col2:
         st.session_state.permits = permits
 
 # Job notes
-# Job notes
 job_notes = st.text_area(
     "Job Notes",
     value=st.session_state.job_notes,
@@ -547,7 +550,7 @@ if job_notes != st.session_state.job_notes:
 st.markdown("---")
 col1, col2, col3 = st.columns([2, 1, 2])
 with col2:
-    if st.button("🔄 Clear All Job Fields", type="secondary", use_container_width=True, help="Reset all fields to start a new job"):
+    if st.button("🔄 Clear All Job Fields", type="secondary", width="stretch", help="Reset all fields to start a new job"):
         # Reset ALL session state variables to original defaults
         for key in list(st.session_state.keys()):
             if key != 'authenticated':  # Keep login state
@@ -630,159 +633,263 @@ if uploaded_file is not None:
             # Load JSON
             data = json.load(uploaded_file)
             
-            # Handle both old format (just materials) and new format (with job data)
+            # Handle both old format (just materials) and new format (with customer/labor data)
             if isinstance(data, list):
                 # Old format - just materials list
                 st.session_state.material_list = data
                 st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
-            
             elif isinstance(data, dict):
-                # Handle new format - complete job data
-                if 'company_info' in data:
-                    st.session_state.company_name = data['company_info'].get('company_name', '')
-                    st.session_state.company_address = data['company_info'].get('company_address', '')
+                # New format - full job data - load ALL fields
+                field_mapping = {
+                    'customer_name': 'customer_name',
+                    'company_name': 'company_name', 
+                    'company_address': 'company_address',
+                    'customer_address': 'customer_address',
+                    'customer_phone': 'customer_phone',
+                    'zip_code': 'zip_code',
+                    'job_type': 'job_type',
+                    'permits': 'permits',
+                    'job_manager': 'job_manager',
+                    'job_notes': 'job_notes'
+                }
                 
-                # Load customer info  
-                if 'customer_info' in data:
-                    st.session_state.customer_name = data['customer_info'].get('customer_name', '')
-                    st.session_state.customer_address = data['customer_info'].get('customer_address', '')
-                    st.session_state.customer_phone = data['customer_info'].get('customer_phone', '')
-                    st.session_state.zip_code = data['customer_info'].get('zip_code', '48201')
+                # Load string fields
+                for json_key, session_key in field_mapping.items():
+                    if json_key in data:
+                        setattr(st.session_state, session_key, data.get(json_key, ''))
                 
-                # Load job details - SAFER DATE HANDLING
-                if 'job_details' in data:
-                    st.session_state.job_type = data['job_details'].get('job_type', 'Residential')
-                    
-                    # Handle start_date safely
-                    start_date_str = data['job_details'].get('start_date', '')
-                    if start_date_str and start_date_str.strip():
-                        try:
-                            st.session_state.start_date = datetime.strptime(start_date_str, '%m/%d/%Y').date()
-                        except (ValueError, TypeError):
+                # Load numeric fields with error handling
+                if 'labor_hours' in data:
+                    try:
+                        st.session_state.labor_hours = float(data.get('labor_hours', 0.0))
+                    except (ValueError, TypeError):
+                        st.session_state.labor_hours = 0.0
+                        
+                if 'hourly_rate' in data:
+                    try:
+                        st.session_state.hourly_rate = float(data.get('hourly_rate', 0.0))
+                    except (ValueError, TypeError):
+                        st.session_state.hourly_rate = 0.0
+                
+                # Load date fields with multiple format support
+                if 'start_date' in data:
+                    try:
+                        from datetime import datetime
+                        date_str = data.get('start_date')
+                        # Try multiple date formats
+                        for fmt in ['%m/%d/%Y', '%Y-%m-%d', '%m-%d-%Y']:
+                            try:
+                                st.session_state.start_date = datetime.strptime(date_str, fmt).date()
+                                break
+                            except:
+                                continue
+                        else:
                             st.session_state.start_date = date.today()
-                    else:
+                    except:
                         st.session_state.start_date = date.today()
-                    
-                    # Handle end_date safely  
-                    end_date_str = data['job_details'].get('end_date', '')
-                    if end_date_str and end_date_str.strip():
-                        try:
-                            st.session_state.end_date = datetime.strptime(end_date_str, '%m/%d/%Y').date()
-                        except (ValueError, TypeError):
+                        
+                if 'end_date' in data:
+                    try:
+                        from datetime import datetime
+                        date_str = data.get('end_date')
+                        # Try multiple date formats
+                        for fmt in ['%m/%d/%Y', '%Y-%m-%d', '%m-%d-%Y']:
+                            try:
+                                st.session_state.end_date = datetime.strptime(date_str, fmt).date()
+                                break
+                            except:
+                                continue
+                        else:
                             st.session_state.end_date = date.today()
-                    else:
+                    except:
                         st.session_state.end_date = date.today()
-                    
-                    st.session_state.job_manager = data['job_details'].get('job_manager', '')
-                    st.session_state.permits = data['job_details'].get('permits', '')
-                    st.session_state.job_notes = data['job_details'].get('job_notes', '')
                 
-                # Load labor info
-                if 'labor_info' in data:
-                    st.session_state.labor_hours = float(data['labor_info'].get('labor_hours', 0.0))
-                    st.session_state.hourly_rate = float(data['labor_info'].get('hourly_rate', 0.0))
-                
-                # Load materials
+                # Load materials list
                 if 'materials' in data:
-                    st.session_state.material_list = data.get('materials', [])
-                    customer_display = st.session_state.customer_name or st.session_state.company_name or "job"
-                    st.success(f"✅ Loaded complete job data for {customer_display} with {len(data.get('materials', []))} items")
-                
-                # Legacy support for older formats
-                elif 'customer_name' in data:
-                    st.session_state.customer_name = data.get('customer_name', '')
-                    st.session_state.zip_code = data.get('zip_code', '48201')
-                    st.session_state.labor_hours = float(data.get('labor_hours', 0.0))
-                    st.session_state.hourly_rate = float(data.get('hourly_rate', 0.0))
-                    if 'materials' in data:
-                        st.session_state.material_list = data.get('materials', [])
-                        st.success(f"✅ Loaded job data: {len(data.get('materials', []))} items")
-                    else:
-                        st.session_state.material_list = data
-                        st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+                    materials = data.get('materials', [])
+                    # Clean and validate materials data
+                    cleaned_materials = []
+                    for item in materials:
+                        if isinstance(item, dict) and 'Item' in item:
+                            # Clean up complex quoted strings that can break the data editor
+                            item_name = str(item.get('Item', '')).strip()
+                            # Remove problematic quotes and normalize
+                            item_name = item_name.replace('\"', '"').replace("'", "'")
+                            if item_name.startswith('"') and item_name.endswith('"'):
+                                item_name = item_name[1:-1]
+                            
+                            cleaned_item = {
+                                'Item': item_name,
+                                'Qty': int(item.get('Qty', 1)) if isinstance(item.get('Qty'), (int, float)) else 1,
+                                'Price': float(item.get('Price', 0.0)) if isinstance(item.get('Price'), (int, float)) else 0.0,
+                                'Store': str(item.get('Store', '')),
+                                'Added': str(item.get('Added', date.today().strftime('%m/%d/%Y')))
+                            }
+                            cleaned_materials.append(cleaned_item)
+                    
+                    st.session_state.material_list = cleaned_materials
+                    
+                    # Show success but DON'T immediately rerun to prevent loop
+                    st.success(f"✅ Loaded complete job data: {len(cleaned_materials)} materials for {data.get('customer_name', data.get('company_name', 'customer'))}")
+                    
+                    # Set a flag to prevent immediate rerun loop
+                    st.session_state.just_imported = True
                 else:
-                    # Handle as materials list
-                    st.session_state.material_list = data
-                    st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+                    # Fallback - try to treat entire dict as single material item
+                    if 'Item' in data:
+                        st.session_state.material_list = [data]
+                        st.success(f"✅ Loaded 1 item from {uploaded_file.name}")
+                    else:
+                        st.session_state.material_list = []
+                        st.success(f"✅ Loaded job information (no materials) from {uploaded_file.name}")
+                        
+                    st.session_state.just_imported = True
             
-            # Force refresh to show loaded data
-            time.sleep(0.1)  # Small delay to ensure state is updated
-            st.rerun()
+            # Only rerun if not in an import loop
+            if not st.session_state.get('just_imported', False):
+                # Force UI refresh with small delay
+                import time
+                time.sleep(0.1)
+                st.rerun()
+            else:
+                # Clear the flag after successful import
+                st.session_state.just_imported = False
+            
         elif uploaded_file.name.endswith('.csv'):
-            # Load CSV with improved error handling
+            # Load CSV
             df = pd.read_csv(uploaded_file)
             
-            # Check if first row contains metadata
-            if len(df) > 0 and str(df.iloc[0]['Item']).startswith(('CUSTOMER:', 'COMPANY:')):
+            # Handle multiple metadata rows (first 3 rows contain job info)
+            if len(df) >= 3:
                 try:
-                    # Extract metadata from first rows
-                    first_row = df.iloc[0] if len(df) > 0 else {}
-                    second_row = df.iloc[1] if len(df) > 1 else {}
+                    # Parse first metadata row
+                    row1 = df.iloc[0]
+                    company_name = str(row1['Item']).replace('COMPANY: ', '') if 'COMPANY:' in str(row1['Item']) else ''
+                    if company_name and company_name != 'N/A':
+                        st.session_state.company_name = company_name
                     
-                    # Extract company/customer data from first row
-                    if str(first_row.get('Item', '')).startswith('COMPANY:'):
-                        company_data = str(first_row['Item']).replace('COMPANY: ', '')
-                        if company_data != 'N/A':
-                            st.session_state.company_name = company_data
+                    company_address = str(row1['Qty']).replace('COMPANY_ADDRESS: ', '') if 'COMPANY_ADDRESS:' in str(row1['Qty']) else ''
+                    if company_address and company_address != 'N/A':
+                        st.session_state.company_address = company_address
                     
-                    if str(first_row.get('Qty', '')).startswith('CUSTOMER:'):
-                        customer_data = str(first_row['Qty']).replace('CUSTOMER: ', '')
-                        if customer_data != 'N/A':
-                            st.session_state.customer_name = customer_data
+                    customer_name = str(row1['Price']).replace('CUSTOMER: ', '') if 'CUSTOMER:' in str(row1['Price']) else ''
+                    if customer_name and customer_name != 'N/A':
+                        st.session_state.customer_name = customer_name
                     
-                    # Extract ZIP code
-                    zip_data = str(first_row.get('Store', '')).replace('ZIP: ', '')
-                    if zip_data.isdigit() and len(zip_data) == 5:
-                        st.session_state.zip_code = zip_data
+                    customer_phone = str(row1['Store']).replace('CUSTOMER_PHONE: ', '') if 'CUSTOMER_PHONE:' in str(row1['Store']) else ''
+                    if customer_phone and customer_phone != 'N/A':
+                        st.session_state.customer_phone = customer_phone
                     
-                    # Extract labor data from second row if exists
-                    if len(df) > 1:
-                        labor_hours_data = str(second_row.get('Item', '')).replace('LABOR_HOURS: ', '')
-                        try:
-                            st.session_state.labor_hours = float(labor_hours_data)
-                        except (ValueError, TypeError):
-                            pass
-                        
-                        hourly_rate_data = str(second_row.get('Qty', '')).replace('HOURLY_RATE: ', '')
-                        try:
-                            st.session_state.hourly_rate = float(hourly_rate_data)
-                        except (ValueError, TypeError):
-                            pass
+                    # Parse second metadata row
+                    row2 = df.iloc[1]
+                    customer_address = str(row2['Item']).replace('CUSTOMER_ADDRESS: ', '') if 'CUSTOMER_ADDRESS:' in str(row2['Item']) else ''
+                    if customer_address and customer_address != 'N/A':
+                        st.session_state.customer_address = customer_address
                     
-                    # Remove metadata rows and load materials
-                    df = df.iloc[2:] if len(df) > 1 else df.iloc[1:]
+                    zip_code = str(row2['Qty']).replace('ZIP: ', '') if 'ZIP:' in str(row2['Qty']) else ''
+                    if zip_code and zip_code.isdigit() and len(zip_code) == 5:
+                        st.session_state.zip_code = zip_code
+                    
+                    job_type = str(row2['Price']).replace('JOB_TYPE: ', '') if 'JOB_TYPE:' in str(row2['Price']) else ''
+                    if job_type and job_type != 'N/A':
+                        st.session_state.job_type = job_type
+                    
+                    job_manager = str(row2['Store']).replace('JOB_MANAGER: ', '') if 'JOB_MANAGER:' in str(row2['Store']) else ''
+                    if job_manager and job_manager != 'N/A':
+                        st.session_state.job_manager = job_manager
+                    
+                    permits = str(row2['Added']).replace('PERMITS: ', '') if 'PERMITS:' in str(row2['Added']) else ''
+                    if permits and permits != 'N/A':
+                        st.session_state.permits = permits
+                    
+                    # Parse third metadata row
+                    row3 = df.iloc[2]
+                    try:
+                        start_date_str = str(row3['Item']).replace('START_DATE: ', '') if 'START_DATE:' in str(row3['Item']) else ''
+                        if start_date_str and start_date_str != 'N/A':
+                            from datetime import datetime
+                            st.session_state.start_date = datetime.strptime(start_date_str, '%m/%d/%Y').date()
+                    except:
+                        pass
+                    
+                    try:
+                        end_date_str = str(row3['Qty']).replace('END_DATE: ', '') if 'END_DATE:' in str(row3['Qty']) else ''
+                        if end_date_str and end_date_str != 'N/A':
+                            from datetime import datetime
+                            st.session_state.end_date = datetime.strptime(end_date_str, '%m/%d/%Y').date()
+                    except:
+                        pass
+                    
+                    try:
+                        labor_hours_str = str(row3['Price']).replace('LABOR_HOURS: ', '') if 'LABOR_HOURS:' in str(row3['Price']) else ''
+                        if labor_hours_str and labor_hours_str != 'N/A':
+                            st.session_state.labor_hours = float(labor_hours_str)
+                    except:
+                        pass
+                    
+                    try:
+                        hourly_rate_str = str(row3['Store']).replace('HOURLY_RATE: ', '') if 'HOURLY_RATE:' in str(row3['Store']) else ''
+                        if hourly_rate_str and hourly_rate_str != 'N/A':
+                            st.session_state.hourly_rate = float(hourly_rate_str)
+                    except:
+                        pass
+                    
+                    job_notes = str(row3['Added']).replace('JOB_NOTES: ', '') if 'JOB_NOTES:' in str(row3['Added']) else ''
+                    if job_notes and job_notes != 'N/A':
+                        st.session_state.job_notes = job_notes
+                    
+                    # Remove metadata rows and load materials (rows 3+)
+                    df = df.iloc[3:]
                     
                 except Exception as e:
-                    st.warning(f"Could not parse metadata from CSV: {str(e)}")
-                    # Continue with materials loading
+                    st.error(f"Error parsing CSV metadata: {str(e)}")
+                    # Continue with materials loading even if metadata fails
             
             # Ensure required columns exist for materials
-            if len(df) > 0:
-                if 'Item' not in df.columns:
-                    st.error("CSV must have an 'Item' column")
-                else:
-                    # Fill missing columns with defaults
-                    if 'Qty' not in df.columns:
-                        df['Qty'] = 1
-                    if 'Price' not in df.columns:
-                        df['Price'] = 0.0
-                    if 'Store' not in df.columns:
-                        df['Store'] = ""
-                    if 'Added' not in df.columns:
-                        df['Added'] = date.today().strftime("%m/%d/%Y")
-                    
-                    # Clean the dataframe and convert to records
-                    df = df.dropna(subset=['Item'])  # Remove rows with no item name
-                    st.session_state.material_list = df.to_dict('records')
-                    
-                    customer_msg = f" for {st.session_state.customer_name}" if st.session_state.customer_name else ""
-                    st.success(f"✅ Loaded {len(df)} items{customer_msg} from {uploaded_file.name}")
-            
-            # Force refresh
-            time.sleep(0.1)
-            st.rerun()
+            if len(df) > 0 and 'Item' in df.columns:
+                # Fill missing columns with defaults
+                if 'Qty' not in df.columns:
+                    df['Qty'] = 1
+                if 'Price' not in df.columns:
+                    df['Price'] = 0.0
+                if 'Store' not in df.columns:
+                    df['Store'] = ""
+                if 'Added' not in df.columns:
+                    df['Added'] = date.today().strftime("%m/%d/%Y")
+                
+                # Convert to proper types and clean data
+                df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce').fillna(1).astype(int)
+                df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0.0)
+                df['Store'] = df['Store'].fillna('')
+                df['Added'] = df['Added'].fillna(date.today().strftime("%m/%d/%Y"))
+                
+                # Clean problematic Item strings that can break data editor
+                df['Item'] = df['Item'].astype(str).str.strip()
+                df['Item'] = df['Item'].str.replace('\"', '"').str.replace('"', "'")
+                
+                st.session_state.material_list = df.to_dict('records')
+                customer_msg = f" for {st.session_state.customer_name}" if st.session_state.customer_name else ""
+                st.success(f"✅ Loaded complete job data: {len(df)} materials{customer_msg} from {uploaded_file.name}")
+                
+                # Set flag to prevent rerun loop
+                st.session_state.just_imported = True
+            else:
+                st.warning("No material data found in CSV file")
+                st.session_state.just_imported = True
+                
+            # Only rerun if not in an import loop
+            if not st.session_state.get('just_imported', False):
+                # Force UI refresh
+                import time
+                time.sleep(0.1)
+                st.rerun()
+            else:
+                # Clear the flag after successful import
+                st.session_state.just_imported = False
+                
     except Exception as e:
         st.error(f"Error loading file: {str(e)}")
+        st.error("Please check file format and try again.")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -802,7 +909,7 @@ with col2:
     new_qty = st.number_input("Quantity", min_value=1, value=1, step=1, 
                                label_visibility="collapsed", key=f"qty_input_{st.session_state.input_key}")
 with col3:
-    if st.button("➕ Add", type="primary", use_container_width=True):
+    if st.button("➕ Add", type="primary", width="stretch"):
         if new_item and new_item.strip():
             st.session_state.material_list.append({
                 "Item": new_item.strip(),
@@ -818,8 +925,263 @@ with col3:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+# ===== CONSTRUCTION CALCULATORS SECTION =====
+st.markdown('<div class="section-box">', unsafe_allow_html=True)
+st.markdown("### 🧮 Construction Calculators")
+st.markdown('<p style="color: #a0c4ff; font-size: 0.9rem; margin-bottom: 1rem;">Professional calculators to determine material quantities. Results can be added directly to your materials list.</p>', unsafe_allow_html=True)
+
+# Calculator selection tabs
+calc_tab1, calc_tab2, calc_tab3 = st.tabs(["📐 Square Footage", "🏠 Roofing Squares", "🧱 Material Quantities"])
+
+with calc_tab1:
+    st.markdown("#### 📐 Square Footage Calculator")
+    st.markdown('<p style="color: #a0c4ff; font-size: 0.9rem;">Calculate total square footage for flooring, painting, or general area measurements.</p>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([2, 2, 2])
+    with col1:
+        length_ft = st.number_input("Length (feet)", min_value=0.0, value=0.0, step=0.5, key="sq_length")
+    with col2:
+        width_ft = st.number_input("Width (feet)", min_value=0.0, value=0.0, step=0.5, key="sq_width")
+    with col3:
+        if st.button("🧮 Calculate", key="calc_sqft"):
+            if length_ft > 0 and width_ft > 0:
+                total_sqft = length_ft * width_ft
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                            padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                            border: 1px solid rgba(16, 185, 129, 0.5); text-align: center;">
+                    <h4 style="color: white; margin: 0;">📐 Total Square Footage</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold;">{total_sqft:,.1f} sq ft</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Auto-add to materials list option
+                col_add1, col_add2, col_add3 = st.columns([1, 2, 1])
+                with col_add2:
+                    if st.button(f"➕ Add '{total_sqft:,.1f} sq ft coverage' to Materials", key="add_sqft"):
+                        st.session_state.material_list.append({
+                            "Item": f"Coverage needed: {total_sqft:,.1f} sq ft ({length_ft}' x {width_ft}')",
+                            "Qty": 1,
+                            "Price": 0.0,
+                            "Store": "",
+                            "Added": date.today().strftime("%m/%d/%Y")
+                        })
+                        st.success("✅ Added to materials list!")
+                        st.rerun()
+            else:
+                st.warning("⚠️ Please enter both length and width")
+
+with calc_tab2:
+    st.markdown("#### 🏠 Roofing Squares Calculator")
+    st.markdown('<p style="color: #a0c4ff; font-size: 0.9rem;">Calculate roofing squares (1 square = 100 sq ft) with waste factor.</p>', unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    with col1:
+        roof_length = st.number_input("Roof Length (feet)", min_value=0.0, value=0.0, step=0.5, key="roof_length")
+    with col2:
+        roof_width = st.number_input("Roof Width (feet)", min_value=0.0, value=0.0, step=0.5, key="roof_width")
+    with col3:
+        waste_factor = st.selectbox("Waste Factor", [10, 15, 20, 25], index=1, key="waste_factor", 
+                                   help="10% = simple roof, 15% = standard, 20% = complex, 25% = very complex")
+    with col4:
+        if st.button("🧮 Calculate", key="calc_roof"):
+            if roof_length > 0 and roof_width > 0:
+                base_sqft = roof_length * roof_width
+                waste_sqft = base_sqft * (waste_factor / 100)
+                total_sqft = base_sqft + waste_sqft
+                roofing_squares = total_sqft / 100
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #B86AFF 0%, #7C3AFF 100%); 
+                            padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                            border: 1px solid rgba(184, 106, 255, 0.5);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; text-align: center;">
+                        <div>
+                            <h5 style="color: white; margin: 0;">Base Area</h5>
+                            <p style="color: white; margin: 0.25rem 0; font-size: 1.2rem; font-weight: bold;">{base_sqft:,.0f} sq ft</p>
+                        </div>
+                        <div>
+                            <h5 style="color: white; margin: 0;">+ {waste_factor}% Waste</h5>
+                            <p style="color: white; margin: 0.25rem 0; font-size: 1.2rem; font-weight: bold;">{waste_sqft:,.0f} sq ft</p>
+                        </div>
+                        <div style="border-left: 2px solid rgba(255,255,255,0.3);">
+                            <h5 style="color: white; margin: 0;">🏠 Roofing Squares</h5>
+                            <p style="color: white; margin: 0.25rem 0; font-size: 1.4rem; font-weight: bold;">{roofing_squares:.1f} squares</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Auto-add to materials list option
+                col_add1, col_add2, col_add3 = st.columns([1, 2, 1])
+                with col_add2:
+                    if st.button(f"➕ Add '{roofing_squares:.1f} roofing squares' to Materials", key="add_roof"):
+                        st.session_state.material_list.append({
+                            "Item": f"Roofing material needed: {roofing_squares:.1f} squares ({total_sqft:,.0f} sq ft w/ {waste_factor}% waste)",
+                            "Qty": 1,
+                            "Price": 0.0,
+                            "Store": "",
+                            "Added": date.today().strftime("%m/%d/%Y")
+                        })
+                        st.success("✅ Added to materials list!")
+                        st.rerun()
+            else:
+                st.warning("⚠️ Please enter roof dimensions")
+
+with calc_tab3:
+    st.markdown("#### 🧱 Material Quantity Calculator")
+    st.markdown('<p style="color: #a0c4ff; font-size: 0.9rem;">Quick calculations for common construction materials.</p>', unsafe_allow_html=True)
+    
+    # Simple material calculators
+    material_type = st.selectbox("Material Type", 
+        ["Concrete (cubic yards)", "Gravel/Sand (cubic yards)", "Paint Coverage (gallons)", "Roofing Shingles (bundles)", "Tile/Flooring (pieces)"],
+        key="material_type")
+    
+    if material_type == "Concrete (cubic yards)":
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+        with col1:
+            concrete_length = st.number_input("Length (feet)", min_value=0.0, value=0.0, step=0.5, key="concrete_length")
+        with col2:
+            concrete_width = st.number_input("Width (feet)", min_value=0.0, value=0.0, step=0.5, key="concrete_width")
+        with col3:
+            concrete_depth = st.number_input("Depth (inches)", min_value=0.0, value=4.0, step=0.5, key="concrete_depth")
+        with col4:
+            if st.button("🧮 Calculate", key="calc_concrete"):
+                if concrete_length > 0 and concrete_width > 0 and concrete_depth > 0:
+                    cubic_feet = concrete_length * concrete_width * (concrete_depth / 12)
+                    cubic_yards = cubic_feet / 27
+                    
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #00f0ff 0%, #00c0cc 100%); 
+                                padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                                border: 1px solid rgba(0, 240, 255, 0.5); text-align: center; color: black;">
+                        <h4 style="margin: 0;">🧱 Concrete Needed</h4>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold;">{cubic_yards:.2f} cubic yards</p>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">({cubic_feet:.1f} cubic feet)</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Auto-add option
+                    col_add1, col_add2, col_add3 = st.columns([1, 2, 1])
+                    with col_add2:
+                        if st.button(f"➕ Add '{cubic_yards:.2f} cubic yards concrete' to Materials", key="add_concrete"):
+                            st.session_state.material_list.append({
+                                "Item": f"Concrete: {cubic_yards:.2f} cubic yards ({concrete_length}' x {concrete_width}' x {concrete_depth}\")",
+                                "Qty": 1,
+                                "Price": 0.0,
+                                "Store": "",
+                                "Added": date.today().strftime("%m/%d/%Y")
+                            })
+                            st.success("✅ Added to materials list!")
+                            st.rerun()
+                else:
+                    st.warning("⚠️ Please enter all dimensions")
+    
+    elif material_type == "Paint Coverage (gallons)":
+        col1, col2, col3 = st.columns([2, 2, 2])
+        with col1:
+            paint_sqft = st.number_input("Total Square Feet", min_value=0.0, value=0.0, step=10.0, key="paint_sqft")
+        with col2:
+            coverage_per_gallon = st.number_input("Coverage per Gallon", min_value=200, value=400, step=25, key="coverage", 
+                                                help="Typical: 300-450 sq ft per gallon. Premium paint = 400+ sq ft")
+        with col3:
+            coats = st.selectbox("Number of Coats", [1, 2, 3], index=1, key="coats")
+        
+        if st.button("🧮 Calculate", key="calc_paint"):
+            if paint_sqft > 0:
+                total_coverage_needed = paint_sqft * coats
+                gallons_needed = total_coverage_needed / coverage_per_gallon
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                            padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                            border: 1px solid rgba(16, 185, 129, 0.5); text-align: center;">
+                    <h4 style="color: white; margin: 0;">🎨 Paint Needed</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold;">{gallons_needed:.1f} gallons</p>
+                    <p style="color: white; margin: 0.25rem 0 0 0; font-size: 0.9rem;">({paint_sqft:,.0f} sq ft × {coats} coats @ {coverage_per_gallon} sq ft/gal)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Auto-add option
+                col_add1, col_add2, col_add3 = st.columns([1, 2, 1])
+                with col_add2:
+                    if st.button(f"➕ Add '{gallons_needed:.1f} gallons paint' to Materials", key="add_paint"):
+                        st.session_state.material_list.append({
+                            "Item": f"Paint: {gallons_needed:.1f} gallons ({paint_sqft:,.0f} sq ft, {coats} coats @ {coverage_per_gallon}/gal)",
+                            "Qty": 1,
+                            "Price": 0.0,
+                            "Store": "",
+                            "Added": date.today().strftime("%m/%d/%Y")
+                        })
+                        st.success("✅ Added to materials list!")
+                        st.rerun()
+            else:
+                st.warning("⚠️ Please enter square footage")
+    
+    elif material_type == "Roofing Shingles (bundles)":
+        col1, col2, col3 = st.columns([2, 2, 2])
+        with col1:
+            shingle_sqft = st.number_input("Roof Square Feet", min_value=0.0, value=0.0, step=10.0, key="shingle_sqft")
+        with col2:
+            coverage_per_bundle = st.number_input("Coverage per Bundle", min_value=20, value=33, step=1, key="bundle_coverage", 
+                                                help="Standard: 33.33 sq ft per bundle (1/3 of a roofing square)")
+        with col3:
+            waste_percent = st.selectbox("Waste Factor", [10, 15, 20], index=1, key="shingle_waste", 
+                                       help="15% is standard for most roofs")
+        
+        if st.button("🧮 Calculate", key="calc_shingles"):
+            if shingle_sqft > 0:
+                # Add waste factor
+                total_sqft_needed = shingle_sqft * (1 + waste_percent / 100)
+                bundles_needed = total_sqft_needed / coverage_per_bundle
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #B86AFF 0%, #7C3AFF 100%); 
+                            padding: 1.5rem; border-radius: 12px; margin: 1rem 0;
+                            border: 1px solid rgba(184, 106, 255, 0.5); text-align: center;">
+                    <h4 style="color: white; margin: 0;">🏠 Shingles Needed</h4>
+                    <p style="color: white; margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold;">{bundles_needed:.1f} bundles</p>
+                    <p style="color: white; margin: 0.25rem 0 0 0; font-size: 0.9rem;">({shingle_sqft:,.0f} sq ft + {waste_percent}% waste @ {coverage_per_bundle} sq ft/bundle)</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Auto-add option
+                col_add1, col_add2, col_add3 = st.columns([1, 2, 1])
+                with col_add2:
+                    if st.button(f"➕ Add '{bundles_needed:.1f} shingle bundles' to Materials", key="add_shingles"):
+                        st.session_state.material_list.append({
+                            "Item": f"Roofing shingles: {bundles_needed:.1f} bundles ({shingle_sqft:,.0f} sq ft + {waste_percent}% waste)",
+                            "Qty": 1,
+                            "Price": 0.0,
+                            "Store": "",
+                            "Added": date.today().strftime("%m/%d/%Y")
+                        })
+                        st.success("✅ Added to materials list!")
+                        st.rerun()
+            else:
+                st.warning("⚠️ Please enter roof square footage")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 # ===== MATERIALS LIST SECTION =====
 if st.session_state.material_list:
+    # Safety check - ensure all materials have required fields
+    safe_materials = []
+    for item in st.session_state.material_list:
+        if isinstance(item, dict):
+            safe_item = {
+                'Item': str(item.get('Item', 'Unknown Item')).strip()[:100],  # Limit length
+                'Qty': max(1, int(item.get('Qty', 1))),  # Ensure positive quantity
+                'Price': max(0.0, float(item.get('Price', 0.0))),  # Ensure non-negative price
+                'Store': str(item.get('Store', ''))[:50],  # Limit store name length
+                'Added': str(item.get('Added', date.today().strftime('%m/%d/%Y')))
+            }
+            safe_materials.append(safe_item)
+    
+    # Update with cleaned data
+    if safe_materials != st.session_state.material_list:
+        st.session_state.material_list = safe_materials
+    
     st.markdown('<div class="section-box">', unsafe_allow_html=True)
     st.markdown(f"### 📋 Today's List ({len(st.session_state.material_list)} items)")
     
@@ -854,10 +1216,11 @@ if st.session_state.material_list:
         
         edited_df = st.data_editor(
             df, 
-            use_container_width=True, 
+            width="stretch", 
             hide_index=True,
             height=180,
             disabled=["Added"],
+            key="materials_editor",
             column_config={
                 "Select": st.column_config.CheckboxColumn("☑️", width="small", default=False),
                 "Item": st.column_config.TextColumn("Material Item", width="medium", required=True),
@@ -881,7 +1244,7 @@ if st.session_state.material_list:
         if num_selected > 0:
             col_del1, col_del2, col_del3 = st.columns([2, 1, 2])
             with col_del2:
-                if st.button(f"🗑️ Delete ({num_selected}) Selected", type="primary", use_container_width=True):
+                if st.button(f"🗑️ Delete ({num_selected}) Selected", type="primary", width="stretch"):
                     # Keep only unselected items
                     st.session_state.material_list = edited_df[~selected_mask].drop(columns=['Select']).to_dict('records')
                     st.rerun()
@@ -912,7 +1275,7 @@ if st.session_state.material_list:
                 </div>
             </div>
             <p style="color: rgba(255,255,255,0.9); margin: 1rem 0 0 0; text-align: center; font-size: 0.9rem;">
-                {st.session_state.customer_name and f"Customer: {st.session_state.customer_name}" or ""}{st.session_state.company_name and f" • Company: {st.session_state.company_name}" or ""} • Excludes tax & fees
+                {st.session_state.customer_name and f"Customer: {st.session_state.customer_name} • " or ""}Excludes tax & fees
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -920,52 +1283,43 @@ if st.session_state.material_list:
     st.markdown("---")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button("🗑️ Clear All", use_container_width=True):
+        if st.button("🗑️ Clear All", width="stretch"):
             st.session_state.material_list = []
             st.rerun()
     with col2:
         # Better formatted text export
-        list_text = "=" * 80 + "\n"
-        list_text += "VLF CONSTRUCTION JOB ESTIMATE\n"
-        list_text += "=" * 80 + "\n"
-        list_text += f"Generated: {date.today().strftime('%m/%d/%Y')}\n\n"
+        list_text = "=" * 60 + "\n"
+        list_text += "VLF MATERIALS & LABOR ESTIMATE\n"
+        list_text += "=" * 60 + "\n"
+        list_text += f"Date: {date.today().strftime('%m/%d/%Y')}\n"
         
-        # Company Information
         if st.session_state.company_name:
-            list_text += "COMPANY INFORMATION:\n"
-            list_text += "-" * 40 + "\n"
             list_text += f"Company: {st.session_state.company_name}\n"
-            if st.session_state.company_address:
-                list_text += f"Address: {st.session_state.company_address}\n"
-            list_text += "\n"
+        if st.session_state.company_address:
+            list_text += f"Company Address: {st.session_state.company_address}\n"
         
-        # Customer Information
-        list_text += "CUSTOMER INFORMATION:\n"
-        list_text += "-" * 40 + "\n"
         if st.session_state.customer_name:
             list_text += f"Customer: {st.session_state.customer_name}\n"
         if st.session_state.customer_phone:
-            list_text += f"Phone: {st.session_state.customer_phone}\n"
+            list_text += f"Customer Phone: {st.session_state.customer_phone}\n"
         if st.session_state.customer_address:
             list_text += f"Job Site: {st.session_state.customer_address}\n"
-        list_text += f"ZIP Code: {st.session_state.zip_code}\n\n"
         
-        # Job Details
-        list_text += "JOB DETAILS:\n"
-        list_text += "-" * 40 + "\n"
-        list_text += f"Job Type: {st.session_state.job_type}\n"
-        list_text += f"Start Date: {st.session_state.start_date.strftime('%m/%d/%Y')}\n"
-        list_text += f"End Date: {st.session_state.end_date.strftime('%m/%d/%Y')}\n"
+        list_text += f"ZIP Code: {st.session_state.zip_code}\n"
+        
         if st.session_state.job_manager:
             list_text += f"Job Manager: {st.session_state.job_manager}\n"
         if st.session_state.permits:
             list_text += f"Permits: {st.session_state.permits}\n"
         if st.session_state.job_notes:
-            list_text += f"Notes: {st.session_state.job_notes}\n"
-        list_text += "\n"
+            list_text += f"Job Notes: {st.session_state.job_notes}\n"
+        
+        list_text += f"Job Dates: {st.session_state.start_date.strftime('%m/%d/%Y')} to {st.session_state.end_date.strftime('%m/%d/%Y')}\n"
+        list_text += f"Job Type: {st.session_state.job_type}\n"
+        list_text += "=" * 60 + "\n\n"
         
         list_text += "MATERIALS:\n"
-        list_text += "-" * 40 + "\n"
+        list_text += "-" * 30 + "\n"
         materials_total = 0
         for idx, item in enumerate(st.session_state.material_list, 1):
             qty = item.get('Qty', 1)
@@ -994,106 +1348,83 @@ if st.session_state.material_list:
             list_text += f"LABOR TOTAL: ${labor_cost:,.2f}\n\n"
         
         grand_total = materials_total + labor_cost
-        list_text += "=" * 80 + "\n"
+        list_text += "=" * 60 + "\n"
         list_text += f"GRAND TOTAL: ${grand_total:,.2f}\n"
-        list_text += "=" * 80 + "\n"
+        list_text += "=" * 60 + "\n"
         list_text += "\n(Excludes tax & fees)\n"
         
-        # Generate filename with company and customer info
-        filename_parts = []
-        if st.session_state.company_name:
-            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
-        if st.session_state.customer_name:
-            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
-        filename_parts.append(date.today().strftime('%Y%m%d'))
-        filename = f"estimate_{'_'.join(filename_parts)}.txt"
+        filename = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.txt"
         
         st.download_button("📋 Text List", list_text, 
                           filename, 
-                          "text/plain", use_container_width=True)
+                          "text/plain", width="stretch")
     with col3:
-        # Enhanced CSV with all job data
+        # Enhanced CSV with customer and labor data
         export_data = st.session_state.material_list.copy()
         if export_data:
-            # Add comprehensive metadata to first row
-            metadata = {
-                'Item': f"COMPANY: {st.session_state.company_name or 'N/A'}",
-                'Qty': f"CUSTOMER: {st.session_state.customer_name or 'N/A'}",
-                'Price': f"JOB_TYPE: {st.session_state.job_type}",
-                'Store': f"ZIP: {st.session_state.zip_code}",
-                'Added': f"START: {st.session_state.start_date.strftime('%m/%d/%Y')}"
-            }
-            export_data.insert(0, metadata)
-            
-            # Add labor information in second row
-            labor_metadata = {
-                'Item': f"LABOR_HOURS: {st.session_state.labor_hours}",
-                'Qty': f"HOURLY_RATE: {st.session_state.hourly_rate}",
-                'Price': f"JOB_MANAGER: {st.session_state.job_manager or 'N/A'}",
-                'Store': f"PERMITS: {st.session_state.permits or 'N/A'}",
-                'Added': f"END: {st.session_state.end_date.strftime('%m/%d/%Y')}"
-            }
-            export_data.insert(1, labor_metadata)
+            # Add metadata to first few rows
+            metadata_rows = [
+                {
+                    'Item': f"COMPANY: {st.session_state.company_name or 'N/A'}",
+                    'Qty': f"COMPANY_ADDRESS: {st.session_state.company_address or 'N/A'}",
+                    'Price': f"CUSTOMER: {st.session_state.customer_name or 'N/A'}",
+                    'Store': f"CUSTOMER_PHONE: {st.session_state.customer_phone or 'N/A'}",
+                    'Added': date.today().strftime('%m/%d/%Y')
+                },
+                {
+                    'Item': f"CUSTOMER_ADDRESS: {st.session_state.customer_address or 'N/A'}",
+                    'Qty': f"ZIP: {st.session_state.zip_code}",
+                    'Price': f"JOB_TYPE: {st.session_state.job_type}",
+                    'Store': f"JOB_MANAGER: {st.session_state.job_manager or 'N/A'}",
+                    'Added': f"PERMITS: {st.session_state.permits or 'N/A'}"
+                },
+                {
+                    'Item': f"START_DATE: {st.session_state.start_date.strftime('%m/%d/%Y')}",
+                    'Qty': f"END_DATE: {st.session_state.end_date.strftime('%m/%d/%Y')}",
+                    'Price': f"LABOR_HOURS: {st.session_state.labor_hours}",
+                    'Store': f"HOURLY_RATE: {st.session_state.hourly_rate}",
+                    'Added': f"JOB_NOTES: {st.session_state.job_notes or 'N/A'}"
+                }
+            ]
+            # Insert metadata at the beginning
+            for i, metadata in enumerate(metadata_rows):
+                export_data.insert(i, metadata)
         
         csv_data = pd.DataFrame(export_data).to_csv(index=False)
-        
-        # Generate filename with company and customer info
-        filename_parts = []
-        if st.session_state.company_name:
-            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
-        if st.session_state.customer_name:
-            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
-        filename_parts.append(date.today().strftime('%Y%m%d'))
-        filename_csv = f"estimate_{'_'.join(filename_parts)}.csv"
+        filename_csv = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.csv"
         st.download_button("📥 CSV Export", csv_data, 
                           filename_csv, 
-                          "text/csv", use_container_width=True)
+                          "text/csv", width="stretch")
     with col4:
-        # Enhanced JSON export with complete job data
+        # Enhanced JSON export with customer and labor data
         export_json = {
-            'company_info': {
-                'company_name': st.session_state.company_name,
-                'company_address': st.session_state.company_address
-            },
-            'customer_info': {
-                'customer_name': st.session_state.customer_name,
-                'customer_address': st.session_state.customer_address,
-                'customer_phone': st.session_state.customer_phone,
-                'zip_code': st.session_state.zip_code
-            },
-            'job_details': {
-                'job_type': st.session_state.job_type,
-                'start_date': st.session_state.start_date.strftime('%m/%d/%Y'),
-                'end_date': st.session_state.end_date.strftime('%m/%d/%Y'),
-                'job_manager': st.session_state.job_manager,
-                'permits': st.session_state.permits,
-                'job_notes': st.session_state.job_notes
-            },
-            'labor_info': {
-                'labor_hours': st.session_state.labor_hours,
-                'hourly_rate': st.session_state.hourly_rate
-            },
+            'company_name': st.session_state.company_name,
+            'company_address': st.session_state.company_address,
+            'customer_name': st.session_state.customer_name,
+            'customer_address': st.session_state.customer_address,
+            'customer_phone': st.session_state.customer_phone,
+            'zip_code': st.session_state.zip_code,
+            'start_date': st.session_state.start_date.strftime('%m/%d/%Y'),
+            'end_date': st.session_state.end_date.strftime('%m/%d/%Y'),
+            'job_type': st.session_state.job_type,
+            'permits': st.session_state.permits,
+            'job_manager': st.session_state.job_manager,
+            'job_notes': st.session_state.job_notes,
+            'labor_hours': st.session_state.labor_hours,
+            'hourly_rate': st.session_state.hourly_rate,
+            'date_created': date.today().strftime('%m/%d/%Y'),
             'materials': st.session_state.material_list,
             'totals': {
                 'materials_total': calculate_total(st.session_state.material_list),
                 'labor_total': calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate),
                 'grand_total': calculate_total(st.session_state.material_list) + calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate)
-            },
-            'generated_date': date.today().strftime('%m/%d/%Y')
+            }
         }
         json_data = json.dumps(export_json, indent=2)
-        
-        # Generate filename with company and customer info
-        filename_parts = []
-        if st.session_state.company_name:
-            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
-        if st.session_state.customer_name:
-            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
-        filename_parts.append(date.today().strftime('%Y%m%d'))
-        filename_json = f"estimate_{'_'.join(filename_parts)}.json"
+        filename_json = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.json"
         st.download_button("💾 JSON Export", json_data, 
                           filename_json,
-                          "application/json", use_container_width=True)
+                          "application/json", width="stretch")
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
@@ -1112,7 +1443,7 @@ if st.session_state.material_list:
     with col1:
         store_choice = st.selectbox("Select Store:", ["Home Depot", "Lowe's"], label_visibility="collapsed")
     with col2:
-        if st.button("🔍 Generate Search Links", type="primary", use_container_width=True):
+        if st.button("🔍 Generate Search Links", type="primary", width="stretch"):
             st.session_state.show_results = True
             st.rerun()
     
