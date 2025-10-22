@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 import urllib.parse
 import json
+import time
 
 # Page config
 st.set_page_config(page_title="VLF Materials Finder & Calculator", page_icon="🔨", layout="wide")
@@ -190,9 +191,21 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
-    .stNumberInput label {
+    .stDateInput label {
         color: #00D9FF !important;
         font-weight: 600 !important;
+    }
+    
+    .stDateInput input {
+        background-color: rgba(30, 58, 95, 0.6) !important;
+        border: 1px solid rgba(184, 106, 255, 0.3) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+    }
+    
+    .stDateInput input:focus {
+        border-color: #B86AFF !important;
+        box-shadow: 0 0 10px rgba(184, 106, 255, 0.3) !important;
     }
     
     .stMarkdown {
@@ -321,6 +334,27 @@ if 'labor_hours' not in st.session_state:
     st.session_state.labor_hours = 0.0
 if 'hourly_rate' not in st.session_state:
     st.session_state.hourly_rate = 0.0
+# New job management fields
+if 'company_name' not in st.session_state:
+    st.session_state.company_name = ""
+if 'company_address' not in st.session_state:
+    st.session_state.company_address = ""
+if 'customer_address' not in st.session_state:
+    st.session_state.customer_address = ""
+if 'customer_phone' not in st.session_state:
+    st.session_state.customer_phone = ""
+if 'start_date' not in st.session_state:
+    st.session_state.start_date = date.today()
+if 'end_date' not in st.session_state:
+    st.session_state.end_date = date.today()
+if 'job_type' not in st.session_state:
+    st.session_state.job_type = "Residential"
+if 'permits' not in st.session_state:
+    st.session_state.permits = ""
+if 'job_manager' not in st.session_state:
+    st.session_state.job_manager = ""
+if 'job_notes' not in st.session_state:
+    st.session_state.job_notes = ""
 
 # Helper function to calculate total
 def calculate_total(material_list):
@@ -358,27 +392,79 @@ with col_head2:
         st.session_state.authenticated = False
         st.rerun()
 
+# ===== COMPANY INFORMATION SECTION =====
+st.markdown('<div class="section-box">', unsafe_allow_html=True)
+st.markdown("### 🏢 Company Information")
+
+col1, col2 = st.columns(2)
+with col1:
+    company_name = st.text_input(
+        "Company Name", 
+        value=st.session_state.company_name,
+        placeholder="Your construction company name",
+        help="The company performing this job"
+    )
+    if company_name != st.session_state.company_name:
+        st.session_state.company_name = company_name
+
+with col2:
+    company_address = st.text_area(
+        "Company Address", 
+        value=st.session_state.company_address,
+        placeholder="123 Main St, Detroit, MI 48201",
+        height=100,
+        help="Your company's business address"
+    )
+    if company_address != st.session_state.company_address:
+        st.session_state.company_address = company_address
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 # ===== CUSTOMER & JOB INFORMATION SECTION =====
 st.markdown('<div class="section-box">', unsafe_allow_html=True)
 st.markdown("### 👤 Customer & Job Information")
 
+# Customer details row
 col1, col2 = st.columns(2)
 with col1:
     customer_name = st.text_input(
         "Customer Name", 
         value=st.session_state.customer_name,
-        placeholder="Enter customer name for this job",
-        key="customer_name_input"
+        placeholder="Enter customer name for this job"
     )
     if customer_name != st.session_state.customer_name:
         st.session_state.customer_name = customer_name
 
 with col2:
+    customer_phone = st.text_input(
+        "Customer Phone", 
+        value=st.session_state.customer_phone,
+        placeholder="(555) 123-4567",
+        help="Customer contact number"
+    )
+    if customer_phone != st.session_state.customer_phone:
+        st.session_state.customer_phone = customer_phone
+
+# Customer address and ZIP
+col1, col2 = st.columns([3, 1])
+with col1:
+    customer_address = st.text_area(
+        "Customer Address", 
+        value=st.session_state.customer_address,
+        placeholder="456 Oak Street, Detroit, MI 48201",
+        height=100,
+        help="Job site address"
+    )
+    if customer_address != st.session_state.customer_address:
+        st.session_state.customer_address = customer_address
+
+with col2:
+    st.markdown("**ZIP Code**")
     subcol1, subcol2 = st.columns([2, 1])
     with subcol1:
         zip_input = st.text_input("ZIP Code", value=st.session_state.zip_code, 
                                   max_chars=5, label_visibility="collapsed",
-                                  placeholder="Enter ZIP code", key="zip_input")
+                                  placeholder="ZIP", key="zip_input")
     with subcol2:
         if st.button("🔄 Update", use_container_width=True):
             if zip_input.isdigit() and len(zip_input) == 5:
@@ -386,6 +472,107 @@ with col2:
                 st.success(f"✓ Updated to {zip_input}")
             else:
                 st.error("Invalid ZIP")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ===== JOB DETAILS SECTION =====
+st.markdown('<div class="section-box-purple">', unsafe_allow_html=True)
+st.markdown("### 📅 Job Details")
+
+# Job dates and type
+col1, col2, col3 = st.columns(3)
+with col1:
+    start_date = st.date_input(
+        "Start Date",
+        value=st.session_state.start_date,
+        help="Project start date"
+    )
+    if start_date != st.session_state.start_date:
+        st.session_state.start_date = start_date
+
+with col2:
+    end_date = st.date_input(
+        "End Date",
+        value=st.session_state.end_date,
+        help="Expected completion date"
+    )
+    if end_date != st.session_state.end_date:
+        st.session_state.end_date = end_date
+
+with col3:
+    job_type = st.selectbox(
+        "Job Type",
+        options=["Residential", "Commercial"],
+        index=0 if st.session_state.job_type == "Residential" else 1,
+        help="Type of construction project"
+    )
+    if job_type != st.session_state.job_type:
+        st.session_state.job_type = job_type
+
+# Job manager and permits
+col1, col2 = st.columns(2)
+with col1:
+    job_manager = st.text_input(
+        "Job Manager",
+        value=st.session_state.job_manager,
+        placeholder="Project manager or foreman",
+        help="Person responsible for this job"
+    )
+    if job_manager != st.session_state.job_manager:
+        st.session_state.job_manager = job_manager
+
+with col2:
+    permits = st.text_input(
+        "Permits Required",
+        value=st.session_state.permits,
+        placeholder="Building permit, electrical, etc.",
+        help="Required permits for this job"
+    )
+    if permits != st.session_state.permits:
+        st.session_state.permits = permits
+
+# Job notes
+# Job notes
+job_notes = st.text_area(
+    "Job Notes",
+    value=st.session_state.job_notes,
+    placeholder="Special instructions, customer preferences, site conditions, etc.",
+    height=120,
+    help="Any additional information about this job"
+)
+if job_notes != st.session_state.job_notes:
+    st.session_state.job_notes = job_notes
+
+# Clear all fields button
+st.markdown("---")
+col1, col2, col3 = st.columns([2, 1, 2])
+with col2:
+    if st.button("🔄 Clear All Job Fields", type="secondary", use_container_width=True, help="Reset all fields to start a new job"):
+        # Reset ALL session state variables to original defaults
+        for key in list(st.session_state.keys()):
+            if key != 'authenticated':  # Keep login state
+                del st.session_state[key]
+        
+        # Re-initialize with defaults
+        st.session_state.material_list = []
+        st.session_state.zip_code = "48201"
+        st.session_state.input_key = 0
+        st.session_state.customer_name = ""
+        st.session_state.labor_hours = 0.0
+        st.session_state.hourly_rate = 0.0
+        st.session_state.company_name = ""
+        st.session_state.company_address = ""
+        st.session_state.customer_address = ""
+        st.session_state.customer_phone = ""
+        st.session_state.start_date = date.today()
+        st.session_state.end_date = date.today()
+        st.session_state.job_type = "Residential"
+        st.session_state.permits = ""
+        st.session_state.job_manager = ""
+        st.session_state.job_notes = ""
+        
+        st.success("✅ All fields completely cleared! Ready for new job.")
+        st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -443,76 +630,157 @@ if uploaded_file is not None:
             # Load JSON
             data = json.load(uploaded_file)
             
-            # Handle both old format (just materials) and new format (with customer/labor data)
+            # Handle both old format (just materials) and new format (with job data)
             if isinstance(data, list):
                 # Old format - just materials list
                 st.session_state.material_list = data
                 st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+            
             elif isinstance(data, dict):
-                # New format - full job data
-                if 'customer_name' in data:
-                    st.session_state.customer_name = data.get('customer_name', '')
-                if 'zip_code' in data:
-                    st.session_state.zip_code = data.get('zip_code', '48201')
-                if 'labor_hours' in data:
-                    st.session_state.labor_hours = data.get('labor_hours', 0.0)
-                if 'hourly_rate' in data:
-                    st.session_state.hourly_rate = data.get('hourly_rate', 0.0)
+                # Handle new format - complete job data
+                if 'company_info' in data:
+                    st.session_state.company_name = data['company_info'].get('company_name', '')
+                    st.session_state.company_address = data['company_info'].get('company_address', '')
+                
+                # Load customer info  
+                if 'customer_info' in data:
+                    st.session_state.customer_name = data['customer_info'].get('customer_name', '')
+                    st.session_state.customer_address = data['customer_info'].get('customer_address', '')
+                    st.session_state.customer_phone = data['customer_info'].get('customer_phone', '')
+                    st.session_state.zip_code = data['customer_info'].get('zip_code', '48201')
+                
+                # Load job details - SAFER DATE HANDLING
+                if 'job_details' in data:
+                    st.session_state.job_type = data['job_details'].get('job_type', 'Residential')
+                    
+                    # Handle start_date safely
+                    start_date_str = data['job_details'].get('start_date', '')
+                    if start_date_str and start_date_str.strip():
+                        try:
+                            st.session_state.start_date = datetime.strptime(start_date_str, '%m/%d/%Y').date()
+                        except (ValueError, TypeError):
+                            st.session_state.start_date = date.today()
+                    else:
+                        st.session_state.start_date = date.today()
+                    
+                    # Handle end_date safely  
+                    end_date_str = data['job_details'].get('end_date', '')
+                    if end_date_str and end_date_str.strip():
+                        try:
+                            st.session_state.end_date = datetime.strptime(end_date_str, '%m/%d/%Y').date()
+                        except (ValueError, TypeError):
+                            st.session_state.end_date = date.today()
+                    else:
+                        st.session_state.end_date = date.today()
+                    
+                    st.session_state.job_manager = data['job_details'].get('job_manager', '')
+                    st.session_state.permits = data['job_details'].get('permits', '')
+                    st.session_state.job_notes = data['job_details'].get('job_notes', '')
+                
+                # Load labor info
+                if 'labor_info' in data:
+                    st.session_state.labor_hours = float(data['labor_info'].get('labor_hours', 0.0))
+                    st.session_state.hourly_rate = float(data['labor_info'].get('hourly_rate', 0.0))
+                
+                # Load materials
                 if 'materials' in data:
                     st.session_state.material_list = data.get('materials', [])
-                    st.success(f"✅ Loaded complete job data: {len(data.get('materials', []))} items for {data.get('customer_name', 'customer')}")
+                    customer_display = st.session_state.customer_name or st.session_state.company_name or "job"
+                    st.success(f"✅ Loaded complete job data for {customer_display} with {len(data.get('materials', []))} items")
+                
+                # Legacy support for older formats
+                elif 'customer_name' in data:
+                    st.session_state.customer_name = data.get('customer_name', '')
+                    st.session_state.zip_code = data.get('zip_code', '48201')
+                    st.session_state.labor_hours = float(data.get('labor_hours', 0.0))
+                    st.session_state.hourly_rate = float(data.get('hourly_rate', 0.0))
+                    if 'materials' in data:
+                        st.session_state.material_list = data.get('materials', [])
+                        st.success(f"✅ Loaded job data: {len(data.get('materials', []))} items")
+                    else:
+                        st.session_state.material_list = data
+                        st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
                 else:
+                    # Handle as materials list
                     st.session_state.material_list = data
                     st.success(f"✅ Loaded {len(data)} items from {uploaded_file.name}")
+            
+            # Force refresh to show loaded data
+            time.sleep(0.1)  # Small delay to ensure state is updated
             st.rerun()
         elif uploaded_file.name.endswith('.csv'):
-            # Load CSV
+            # Load CSV with improved error handling
             df = pd.read_csv(uploaded_file)
+            
             # Check if first row contains metadata
-            if len(df) > 0 and str(df.iloc[0]['Item']).startswith('CUSTOMER:'):
-                # Extract metadata from first row
-                first_row = df.iloc[0]
-                customer_data = str(first_row['Item']).replace('CUSTOMER: ', '')
-                if customer_data != 'N/A':
-                    st.session_state.customer_name = customer_data
-                
-                labor_hours_data = str(first_row['Qty']).replace('LABOR_HOURS: ', '')
+            if len(df) > 0 and str(df.iloc[0]['Item']).startswith(('CUSTOMER:', 'COMPANY:')):
                 try:
-                    st.session_state.labor_hours = float(labor_hours_data)
-                except:
-                    pass
-                
-                hourly_rate_data = str(first_row['Price']).replace('HOURLY_RATE: ', '')
-                try:
-                    st.session_state.hourly_rate = float(hourly_rate_data)
-                except:
-                    pass
-                
-                zip_data = str(first_row['Store']).replace('ZIP: ', '')
-                if zip_data.isdigit() and len(zip_data) == 5:
-                    st.session_state.zip_code = zip_data
-                
-                # Remove metadata row and load materials
-                df = df.iloc[1:]
+                    # Extract metadata from first rows
+                    first_row = df.iloc[0] if len(df) > 0 else {}
+                    second_row = df.iloc[1] if len(df) > 1 else {}
+                    
+                    # Extract company/customer data from first row
+                    if str(first_row.get('Item', '')).startswith('COMPANY:'):
+                        company_data = str(first_row['Item']).replace('COMPANY: ', '')
+                        if company_data != 'N/A':
+                            st.session_state.company_name = company_data
+                    
+                    if str(first_row.get('Qty', '')).startswith('CUSTOMER:'):
+                        customer_data = str(first_row['Qty']).replace('CUSTOMER: ', '')
+                        if customer_data != 'N/A':
+                            st.session_state.customer_name = customer_data
+                    
+                    # Extract ZIP code
+                    zip_data = str(first_row.get('Store', '')).replace('ZIP: ', '')
+                    if zip_data.isdigit() and len(zip_data) == 5:
+                        st.session_state.zip_code = zip_data
+                    
+                    # Extract labor data from second row if exists
+                    if len(df) > 1:
+                        labor_hours_data = str(second_row.get('Item', '')).replace('LABOR_HOURS: ', '')
+                        try:
+                            st.session_state.labor_hours = float(labor_hours_data)
+                        except (ValueError, TypeError):
+                            pass
+                        
+                        hourly_rate_data = str(second_row.get('Qty', '')).replace('HOURLY_RATE: ', '')
+                        try:
+                            st.session_state.hourly_rate = float(hourly_rate_data)
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    # Remove metadata rows and load materials
+                    df = df.iloc[2:] if len(df) > 1 else df.iloc[1:]
+                    
+                except Exception as e:
+                    st.warning(f"Could not parse metadata from CSV: {str(e)}")
+                    # Continue with materials loading
             
             # Ensure required columns exist for materials
-            if 'Item' not in df.columns:
-                st.error("CSV must have an 'Item' column")
-            else:
-                # Fill missing columns with defaults
-                if 'Qty' not in df.columns:
-                    df['Qty'] = 1
-                if 'Price' not in df.columns:
-                    df['Price'] = 0.0
-                if 'Store' not in df.columns:
-                    df['Store'] = ""
-                if 'Added' not in df.columns:
-                    df['Added'] = date.today().strftime("%m/%d/%Y")
-                
-                st.session_state.material_list = df.to_dict('records')
-                customer_msg = f" for {st.session_state.customer_name}" if st.session_state.customer_name else ""
-                st.success(f"✅ Loaded {len(df)} items{customer_msg} from {uploaded_file.name}")
-                st.rerun()
+            if len(df) > 0:
+                if 'Item' not in df.columns:
+                    st.error("CSV must have an 'Item' column")
+                else:
+                    # Fill missing columns with defaults
+                    if 'Qty' not in df.columns:
+                        df['Qty'] = 1
+                    if 'Price' not in df.columns:
+                        df['Price'] = 0.0
+                    if 'Store' not in df.columns:
+                        df['Store'] = ""
+                    if 'Added' not in df.columns:
+                        df['Added'] = date.today().strftime("%m/%d/%Y")
+                    
+                    # Clean the dataframe and convert to records
+                    df = df.dropna(subset=['Item'])  # Remove rows with no item name
+                    st.session_state.material_list = df.to_dict('records')
+                    
+                    customer_msg = f" for {st.session_state.customer_name}" if st.session_state.customer_name else ""
+                    st.success(f"✅ Loaded {len(df)} items{customer_msg} from {uploaded_file.name}")
+            
+            # Force refresh
+            time.sleep(0.1)
+            st.rerun()
     except Exception as e:
         st.error(f"Error loading file: {str(e)}")
 
@@ -644,7 +912,7 @@ if st.session_state.material_list:
                 </div>
             </div>
             <p style="color: rgba(255,255,255,0.9); margin: 1rem 0 0 0; text-align: center; font-size: 0.9rem;">
-                {st.session_state.customer_name and f"Customer: {st.session_state.customer_name} • " or ""}Excludes tax & fees
+                {st.session_state.customer_name and f"Customer: {st.session_state.customer_name}" or ""}{st.session_state.company_name and f" • Company: {st.session_state.company_name}" or ""} • Excludes tax & fees
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -657,17 +925,47 @@ if st.session_state.material_list:
             st.rerun()
     with col2:
         # Better formatted text export
-        list_text = "=" * 60 + "\n"
-        list_text += "VLF MATERIALS & LABOR ESTIMATE\n"
-        list_text += "=" * 60 + "\n"
-        list_text += f"Date: {date.today().strftime('%m/%d/%Y')}\n"
+        list_text = "=" * 80 + "\n"
+        list_text += "VLF CONSTRUCTION JOB ESTIMATE\n"
+        list_text += "=" * 80 + "\n"
+        list_text += f"Generated: {date.today().strftime('%m/%d/%Y')}\n\n"
+        
+        # Company Information
+        if st.session_state.company_name:
+            list_text += "COMPANY INFORMATION:\n"
+            list_text += "-" * 40 + "\n"
+            list_text += f"Company: {st.session_state.company_name}\n"
+            if st.session_state.company_address:
+                list_text += f"Address: {st.session_state.company_address}\n"
+            list_text += "\n"
+        
+        # Customer Information
+        list_text += "CUSTOMER INFORMATION:\n"
+        list_text += "-" * 40 + "\n"
         if st.session_state.customer_name:
             list_text += f"Customer: {st.session_state.customer_name}\n"
-        list_text += f"ZIP Code: {st.session_state.zip_code}\n"
-        list_text += "=" * 60 + "\n\n"
+        if st.session_state.customer_phone:
+            list_text += f"Phone: {st.session_state.customer_phone}\n"
+        if st.session_state.customer_address:
+            list_text += f"Job Site: {st.session_state.customer_address}\n"
+        list_text += f"ZIP Code: {st.session_state.zip_code}\n\n"
+        
+        # Job Details
+        list_text += "JOB DETAILS:\n"
+        list_text += "-" * 40 + "\n"
+        list_text += f"Job Type: {st.session_state.job_type}\n"
+        list_text += f"Start Date: {st.session_state.start_date.strftime('%m/%d/%Y')}\n"
+        list_text += f"End Date: {st.session_state.end_date.strftime('%m/%d/%Y')}\n"
+        if st.session_state.job_manager:
+            list_text += f"Job Manager: {st.session_state.job_manager}\n"
+        if st.session_state.permits:
+            list_text += f"Permits: {st.session_state.permits}\n"
+        if st.session_state.job_notes:
+            list_text += f"Notes: {st.session_state.job_notes}\n"
+        list_text += "\n"
         
         list_text += "MATERIALS:\n"
-        list_text += "-" * 30 + "\n"
+        list_text += "-" * 40 + "\n"
         materials_total = 0
         for idx, item in enumerate(st.session_state.material_list, 1):
             qty = item.get('Qty', 1)
@@ -696,52 +994,103 @@ if st.session_state.material_list:
             list_text += f"LABOR TOTAL: ${labor_cost:,.2f}\n\n"
         
         grand_total = materials_total + labor_cost
-        list_text += "=" * 60 + "\n"
+        list_text += "=" * 80 + "\n"
         list_text += f"GRAND TOTAL: ${grand_total:,.2f}\n"
-        list_text += "=" * 60 + "\n"
+        list_text += "=" * 80 + "\n"
         list_text += "\n(Excludes tax & fees)\n"
         
-        filename = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.txt"
+        # Generate filename with company and customer info
+        filename_parts = []
+        if st.session_state.company_name:
+            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
+        if st.session_state.customer_name:
+            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
+        filename_parts.append(date.today().strftime('%Y%m%d'))
+        filename = f"estimate_{'_'.join(filename_parts)}.txt"
         
         st.download_button("📋 Text List", list_text, 
                           filename, 
                           "text/plain", use_container_width=True)
     with col3:
-        # Enhanced CSV with customer and labor data
+        # Enhanced CSV with all job data
         export_data = st.session_state.material_list.copy()
         if export_data:
-            # Add metadata to first row
+            # Add comprehensive metadata to first row
             metadata = {
-                'Item': f"CUSTOMER: {st.session_state.customer_name or 'N/A'}",
-                'Qty': f"LABOR_HOURS: {st.session_state.labor_hours}",
-                'Price': f"HOURLY_RATE: {st.session_state.hourly_rate}",
+                'Item': f"COMPANY: {st.session_state.company_name or 'N/A'}",
+                'Qty': f"CUSTOMER: {st.session_state.customer_name or 'N/A'}",
+                'Price': f"JOB_TYPE: {st.session_state.job_type}",
                 'Store': f"ZIP: {st.session_state.zip_code}",
-                'Added': date.today().strftime('%m/%d/%Y')
+                'Added': f"START: {st.session_state.start_date.strftime('%m/%d/%Y')}"
             }
             export_data.insert(0, metadata)
+            
+            # Add labor information in second row
+            labor_metadata = {
+                'Item': f"LABOR_HOURS: {st.session_state.labor_hours}",
+                'Qty': f"HOURLY_RATE: {st.session_state.hourly_rate}",
+                'Price': f"JOB_MANAGER: {st.session_state.job_manager or 'N/A'}",
+                'Store': f"PERMITS: {st.session_state.permits or 'N/A'}",
+                'Added': f"END: {st.session_state.end_date.strftime('%m/%d/%Y')}"
+            }
+            export_data.insert(1, labor_metadata)
         
         csv_data = pd.DataFrame(export_data).to_csv(index=False)
-        filename_csv = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.csv"
+        
+        # Generate filename with company and customer info
+        filename_parts = []
+        if st.session_state.company_name:
+            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
+        if st.session_state.customer_name:
+            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
+        filename_parts.append(date.today().strftime('%Y%m%d'))
+        filename_csv = f"estimate_{'_'.join(filename_parts)}.csv"
         st.download_button("📥 CSV Export", csv_data, 
                           filename_csv, 
                           "text/csv", use_container_width=True)
     with col4:
-        # Enhanced JSON export with customer and labor data
+        # Enhanced JSON export with complete job data
         export_json = {
-            'customer_name': st.session_state.customer_name,
-            'zip_code': st.session_state.zip_code,
-            'labor_hours': st.session_state.labor_hours,
-            'hourly_rate': st.session_state.hourly_rate,
-            'date_created': date.today().strftime('%m/%d/%Y'),
+            'company_info': {
+                'company_name': st.session_state.company_name,
+                'company_address': st.session_state.company_address
+            },
+            'customer_info': {
+                'customer_name': st.session_state.customer_name,
+                'customer_address': st.session_state.customer_address,
+                'customer_phone': st.session_state.customer_phone,
+                'zip_code': st.session_state.zip_code
+            },
+            'job_details': {
+                'job_type': st.session_state.job_type,
+                'start_date': st.session_state.start_date.strftime('%m/%d/%Y'),
+                'end_date': st.session_state.end_date.strftime('%m/%d/%Y'),
+                'job_manager': st.session_state.job_manager,
+                'permits': st.session_state.permits,
+                'job_notes': st.session_state.job_notes
+            },
+            'labor_info': {
+                'labor_hours': st.session_state.labor_hours,
+                'hourly_rate': st.session_state.hourly_rate
+            },
             'materials': st.session_state.material_list,
             'totals': {
                 'materials_total': calculate_total(st.session_state.material_list),
                 'labor_total': calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate),
                 'grand_total': calculate_total(st.session_state.material_list) + calculate_labor_cost(st.session_state.labor_hours, st.session_state.hourly_rate)
-            }
+            },
+            'generated_date': date.today().strftime('%m/%d/%Y')
         }
         json_data = json.dumps(export_json, indent=2)
-        filename_json = f"estimate_{st.session_state.customer_name.replace(' ', '_') if st.session_state.customer_name else 'materials'}_{date.today().strftime('%Y%m%d')}.json"
+        
+        # Generate filename with company and customer info
+        filename_parts = []
+        if st.session_state.company_name:
+            filename_parts.append(st.session_state.company_name.replace(' ', '_'))
+        if st.session_state.customer_name:
+            filename_parts.append(st.session_state.customer_name.replace(' ', '_'))
+        filename_parts.append(date.today().strftime('%Y%m%d'))
+        filename_json = f"estimate_{'_'.join(filename_parts)}.json"
         st.download_button("💾 JSON Export", json_data, 
                           filename_json,
                           "application/json", use_container_width=True)
