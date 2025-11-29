@@ -309,7 +309,7 @@ if not st.session_state.authenticated:
     <ul style="color: #a0c4ff;">
         <li><strong>Solo Contractor:</strong> $10/month</li>
         <li><strong>Small Crew (3-5):</strong> $35/month</li>
-        <li><strong>Company License:</strong> CALL FOR PRICING and more Customization (586)449-4640 Actual Human Will Answer, AI is to assist us all NOT to replace the HUMAN connection</li>
+        <li><strong>Company License:</strong> CALL FOR PRICING and or further Customization (586)449-4640, AI is to assist us all NOT to replace the HUMAN connection.</li>
     </ul>
     """, unsafe_allow_html=True)
     
@@ -1531,3 +1531,4 @@ st.markdown(f"""
     <p style="margin: 0.25rem 0;">📅 {date.today().strftime('%m/%d/%Y')}</p>
 </div>
 """, unsafe_allow_html=True)
+
